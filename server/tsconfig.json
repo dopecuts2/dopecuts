@@ -1,0 +1,16 @@
+// tsconfig.json
+
+{
+  "compilerOptions": {
+    "target": "es6",
+    "module": "commonjs",
+    "outDir": "./dist",
+    // "rootDir": "./src", // <-- REMOVE this line
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true
+  },
+  "include": ["src/**/*", "server.ts"], // <-- UPDATE this line
+  "exclude": ["node_modules", ".vscode"]
+}
