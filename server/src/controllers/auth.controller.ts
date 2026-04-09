@@ -16,7 +16,7 @@ import { sendSms } from '../services/smsService';
 const IS_PROD = process.env.NODE_ENV === 'production';
 const DEV_SEED_ENABLED =
   (!IS_PROD && process.env.DEV_SEED !== 'false') || process.env.DEV_SEED === 'true';
-const DEV_ALLOW_OTP_BYPASS =
+const DEV_ALLOW_OTP_BYPASS = process.env.DEV_ALLOW_OTP_BYPASS === 'true';
   (!IS_PROD && process.env.DEV_ALLOW_OTP_BYPASS !== 'false') || process.env.DEV_ALLOW_OTP_BYPASS === 'true';
 
 const DEV_TEST_EMAIL = 'grey@linconwaves.com';
