@@ -26,6 +26,7 @@ const DEFAULT_ALLOWED_ADMINS = [
   process.env.ALLOWED_ADMIN_EMAILS,
   // Seed/admin defaults used elsewhere in the project
   'leeroy@dopecuts.ca',
+  'leeroyfoghoosiobe@gmail.com',
   DEV_TEST_EMAIL,
 ]
   .join(',')
@@ -96,6 +97,7 @@ export const requestOtp = async (req: Request, res: Response) => {
 
     return res.status(200).json({ message: 'OTP sent to your email successfully.' });
   } catch (error) {
+    logger.error('requestOtp: unhandled error', { error });
     return res.status(500).json({ message: 'Failed to send OTP' });
   }
 };
@@ -148,6 +150,7 @@ export const verifyOtpAndLogin = async (req: Request, res: Response) => {
 
     return res.status(200).json({ message: 'Login successful', admin });
   } catch (error) {
+    logger.error('verifyOtpAndLogin: unhandled error', { error });
     return res.status(500).json({ message: 'Failed to verify OTP' });
   }
 };

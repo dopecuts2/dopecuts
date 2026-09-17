@@ -86,10 +86,17 @@ type EmailKind =
   | 'otp';         // admin OTP
 
 async function isEmailAllowed(kind: EmailKind): Promise<boolean> {
-  const s = await getNotificationSettings(); // creates defaults if missing
-  if (!s.emailEnabled) return false;
-  if (kind === 'confirmation' && !s.autoSendBookingConfirmations) return false;
-  return true;
+  try {
+    const s = await getNotificationSettings(); // creates defaults if missing
+    if (!s.emailEnabled) return false;
+    if (kind === 'confirmation' && !s.autoSendBookingConfirmations) return false;
+    return true;
+  } catch (error) {
+    // Never let a notification-settings lookup failure block email sending
+    // (e.g. it previously took down admin OTP login entirely on a DB hiccup).
+    logger.error('isEmailAllowed: falling back to allowed=true after error', { kind, error });
+    return true;
+  }
 }
 
 function noResendClient(): boolean {
