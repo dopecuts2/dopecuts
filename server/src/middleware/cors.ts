@@ -5,6 +5,9 @@ import { NODE_ENV } from '../config/env';
 const allowedOrigins = [
   // Production URLs from your Vercel account
   'https://dopecuts.ca',
+  'https://www.dopecuts.ca',
+  'https://dopecuts.online',
+  'https://www.dopecuts.online',
   'https://admin.dopecuts.ca',       // <-- ADD THIS for your admin panel
   'https://dopekuts.vercel.app',    // <-- ADD THIS Vercel default URL
 
