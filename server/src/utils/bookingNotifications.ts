@@ -2,7 +2,7 @@ import moment from 'moment-timezone';
 import { DEFAULT_TIMEZONE } from '../config/time';
 import { IBooking } from '../models/booking.model';
 
-const MANAGE_LINK = 'https://dopecuts.ca/reschedule';
+const MANAGE_LINK = 'https://dopecuts.online/reschedule';
 
 function formatDateDMY(date: Date | string | number): string {
   const d = new Date(date);
