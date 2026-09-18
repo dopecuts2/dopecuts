@@ -9,13 +9,13 @@ import { getBusinessTimezone } from '../utils/timezone';
 
 const DEFAULT_START_TIME = '11:00';
 const DEFAULT_END_TIME = '19:00';
-const DEFAULT_SLOT_DURATION = 40;
+const DEFAULT_SLOT_DURATION = 45;
 const DAY_ORDER = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
 const ADAPTIVE_SERVICE_RULES: Array<{ keywords: string[]; duration: number }> = [
-  { keywords: ['kids cut', 'kid cut'], duration: 20 },
-  { keywords: ['hair line up', 'hair line-up', 'hair lineup', 'lineup'], duration: 20 },
-  { keywords: ['beard trim'], duration: 20 },
+  { keywords: ['kids cut', 'kid cut'], duration: 30 },
+  { keywords: ['hair line up', 'hair line-up', 'hair lineup', 'lineup'], duration: 30 },
+  { keywords: ['beard trim'], duration: 30 },
   { keywords: ['deluxe'], duration: 60 },
 ];
 
@@ -51,8 +51,13 @@ function computeSlotStep(slotDuration: number, serviceDuration: number) {
 
   if (service === baseSlot) return baseSlot;
 
-  if (service < baseSlot && baseSlot % service === 0) {
-    return service;
+  // If the service is shorter, use a shared divisor so it still gets a
+  // tighter cadence even when it doesn't divide the base slot evenly
+  // (e.g., 30 min inside a 45-min base -> 15-min cadence).
+  if (service < baseSlot) {
+    const divisor = gcd(baseSlot, service);
+    if (divisor >= 5) return divisor;
+    return baseSlot;
   }
 
   if (service > baseSlot) {
@@ -66,8 +71,8 @@ function computeSlotStep(slotDuration: number, serviceDuration: number) {
 
 function normalizeSlotDuration(duration?: number | null) {
   if (!duration) return DEFAULT_SLOT_DURATION;
-  // Promote legacy 35-minute default to the new 40-minute cadence
-  if (duration === 35) return DEFAULT_SLOT_DURATION;
+  // Promote legacy slot-duration defaults to the current cadence
+  if (duration === 35 || duration === 40) return DEFAULT_SLOT_DURATION;
   return duration;
 }
 

@@ -34,20 +34,20 @@ const getServiceIcon = (serviceName: string): LucideIcon => {
 };
 
 const ADAPTIVE_SERVICE_RULES: Array<{ keywords: string[]; duration: number }> = [
-  { keywords: ['kids cut', 'kid cut'], duration: 20 },
-  { keywords: ['hair line up', 'hair line-up', 'hair lineup', 'lineup'], duration: 20 },
-  { keywords: ['beard trim'], duration: 20 },
+  { keywords: ['kids cut', 'kid cut'], duration: 30 },
+  { keywords: ['hair line up', 'hair line-up', 'hair lineup', 'lineup'], duration: 30 },
+  { keywords: ['beard trim'], duration: 30 },
   { keywords: ['deluxe'], duration: 60 },
 ];
 
 const getAdaptiveDuration = (service?: IService) => {
-  if (!service) return 40;
+  if (!service) return 45;
   const normalized = (service.name || '').toLowerCase();
   const rule = ADAPTIVE_SERVICE_RULES.find((r) =>
     r.keywords.some((keyword) => normalized.includes(keyword))
   );
   if (rule) return rule.duration;
-  return Math.max(service.duration, 40);
+  return Math.max(service.duration, 45);
 };
 
 export function Services() {

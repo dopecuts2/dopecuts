@@ -39,7 +39,7 @@ const STORAGE_START = 'admin-calendar-start';
 const STORAGE_WEEKS = 'admin-calendar-weeks';
 const STORAGE_SLOT_DURATION = 'admin-calendar-slot-duration';
 const STORAGE_VISUALIZER = 'admin-calendar-visualizer-enabled';
-const DEFAULT_SLOT_DURATION = 40;
+const DEFAULT_SLOT_DURATION = 45;
 
 export default function Settings() {
   const [loading, setLoading] = useState(true);
