@@ -234,10 +234,30 @@ export const updateWeeklySchedules = async (req: Request, res: Response) => {
 export const getCalendarSettings = async (_req: Request, res: Response) => {
   try {
     const settings = await CalendarSettings.find().sort({ dayOfWeek: 1 });
-    const normalized = settings.map((setting) => ({
-      ...setting.toObject(),
-      slotDuration: normalizeSlotDuration(setting.slotDuration),
-    }));
+    const byDay = new Map(settings.map((setting) => [setting.dayOfWeek, setting]));
+
+    // There is no admin UI to configure this per-weekday template, so an
+    // empty/partial collection (e.g. a fresh install) must not silently
+    // block every date on the public booking page. Fall back to the same
+    // "open every day" default that Weekly Availability already uses.
+    const normalized = DAY_ORDER.map((dayOfWeek) => {
+      const existing = byDay.get(dayOfWeek);
+      if (existing) {
+        return {
+          ...existing.toObject(),
+          slotDuration: normalizeSlotDuration(existing.slotDuration),
+        };
+      }
+      return {
+        dayOfWeek,
+        startTime: DEFAULT_START_TIME,
+        endTime: DEFAULT_END_TIME,
+        slotDuration: DEFAULT_SLOT_DURATION,
+        isEnabled: true,
+        breaks: [],
+      };
+    });
+
     res.status(200).json(normalized);
   } catch (error) {
     logger.error('Error fetching calendar settings:', error);
