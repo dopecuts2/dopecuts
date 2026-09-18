@@ -22,9 +22,9 @@ const notificationSettingsSchema = new Schema<INotificationSettings>({
   autoSendBookingConfirmations: { type: Boolean, required: true, default: true },
   timezone: { type: String, required: true, default: 'America/Toronto' },
   siteNoticeEnabled: { type: Boolean, required: true, default: false },
-  siteNoticeMessage: { type: String, required: true, default: '' },
+  siteNoticeMessage: { type: String, default: '' },
   productNoticeEnabled: { type: Boolean, required: true, default: false },
-  productNoticeMessage: { type: String, required: true, default: '' },
+  productNoticeMessage: { type: String, default: '' },
   calendarWeeks: { type: Number, required: true, default: 4, min: 1, max: 12 },
 }, { timestamps: true });
 
