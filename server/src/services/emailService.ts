@@ -6,10 +6,10 @@ import { IBooking } from '../models/booking.model';
 import { logger } from '../utils/logger';
 import { getNotificationSettings } from './notificationSettingsService';
 
-const SENDER_EMAIL = 'Roy @ Dopecuts <leeroy@emails.dopecuts.ca>';
+const SENDER_EMAIL = 'Roy @ Dopecuts <leeroy@emails.dopecuts.online>';
 
 // Centralized manage URL provided by product
-const MANAGE_URL = 'https://dopecuts.ca/reschedule';
+const MANAGE_URL = 'https://dopecuts.online/reschedule';
 
 // Lazily instantiate Resend only if we have an API key
 const haveResend = !!RESEND_API_KEY;
@@ -126,7 +126,13 @@ async function guardedSend(
 
   // 3) Send
   try {
-    await resend!.emails.send({ from: SENDER_EMAIL, to, subject, html });
+    const result = await resend!.emails.send({ from: SENDER_EMAIL, to, subject, html });
+    if (result.error) {
+      // The Resend SDK resolves (rather than throws) on API-level errors
+      // (e.g. unverified sending domain), so this must be checked explicitly.
+      logger.error('Resend API returned an error', { to, subject, error: result.error });
+      return { success: false, error: result.error };
+    }
     return { success: true };
   } catch (error) {
     logger.error('Resend send error', { to, subject, error });
