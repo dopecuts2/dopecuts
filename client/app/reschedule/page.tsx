@@ -53,13 +53,13 @@ import { getAvailability } from '@/lib/api/calendar';
 // --- Helpers ---
 
 const ADAPTIVE_SERVICE_RULES: Array<{ keywords: string[]; duration: number }> = [
-  { keywords: ['kids cut', 'kid cut'], duration: 20 },
-  { keywords: ['hair line up', 'hair line-up', 'hair lineup', 'lineup'], duration: 20 },
-  { keywords: ['beard trim'], duration: 20 },
+  { keywords: ['kids cut', 'kid cut'], duration: 30 },
+  { keywords: ['hair line up', 'hair line-up', 'hair lineup', 'lineup'], duration: 30 },
+  { keywords: ['beard trim'], duration: 30 },
   { keywords: ['deluxe'], duration: 60 },
 ];
 
-const DEFAULT_SLOT_DURATION = 40;
+const DEFAULT_SLOT_DURATION = 45;
 
 function getAdaptiveDuration(serviceName?: string, baseDuration?: number) {
   const normalizedName = (serviceName || '').toLowerCase();

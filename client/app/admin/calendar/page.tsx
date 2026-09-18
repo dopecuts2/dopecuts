@@ -73,7 +73,7 @@ function generateTimeOptions(start = '06:00', end = '22:00', intervalMinutes = 2
 
 const timeOptions = generateTimeOptions();
 
-const DEFAULT_SLOT_DURATION = 40;
+const DEFAULT_SLOT_DURATION = 45;
 const STORAGE_SLOT_DURATION = 'admin-calendar-slot-duration';
 const STORAGE_VISUALIZER = 'admin-calendar-visualizer-enabled';
 const MAX_WEEKS = 12;

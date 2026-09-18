@@ -85,9 +85,9 @@ function compressSlotsForService(slots: string[], serviceMin: number, slotStepMi
 }
 
 const ADAPTIVE_SERVICE_RULES: Array<{ keywords: string[]; duration: number }> = [
-  { keywords: ['kids cut', 'kid cut'], duration: 20 },
-  { keywords: ['hair line up', 'hair line-up', 'hair lineup', 'lineup'], duration: 20 },
-  { keywords: ['beard trim'], duration: 20 },
+  { keywords: ['kids cut', 'kid cut'], duration: 30 },
+  { keywords: ['hair line up', 'hair line-up', 'hair lineup', 'lineup'], duration: 30 },
+  { keywords: ['beard trim'], duration: 30 },
   { keywords: ['deluxe'], duration: 60 },
 ];
 
@@ -99,9 +99,9 @@ function getAdaptiveDuration(service?: IService): number {
   const rule = ADAPTIVE_SERVICE_RULES.find((r) =>
     r.keywords.some((keyword) => normalized.includes(keyword))
   );
-  // Default services should be at least one 40-minute slot.
+  // Default services should be at least one 45-minute slot.
   if (rule) return rule.duration;
-  return Math.max(service.duration, 40);
+  return Math.max(service.duration, 45);
 }
 
 /** Find the slotDuration for the selected date from calendar settings */
@@ -1120,7 +1120,7 @@ export default function BookAppointment() {
                           <div className="space-y-4">
                             <Label className="text-white text-base lg:text-lg font-semibold mb-4 block">Select Time</Label>
                             <p className="text-xs text-gray-400 mt-0 mb-3">
-                              Time slots are spaced 40 minutes apart. Kids Cut, Hair Line Up, and Beard Trim use 20-minute half-slots—try those if you need a shorter opening.
+                              Time slots are spaced 45 minutes apart. Kids Cut, Hair Line Up, and Beard Trim use 30-minute slots—try those if you need a shorter opening.
                             </p>
                             {timeSlots.length > 0 ? (
                               <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
@@ -1150,7 +1150,7 @@ export default function BookAppointment() {
                                   If you still want this date we can queue you for the first cancellation.
                                 </p>
                                 <p className="text-sm text-gray-300">
-                                  Tip: shorter services (Kids Cut, Hair Line Up, Beard Trim) use 20-minute half-slots and may open up sooner.
+                                  Tip: shorter services (Kids Cut, Hair Line Up, Beard Trim) use 30-minute slots and may open up sooner.
                                 </p>
                                 <p className="text-xs text-gray-400">
                                   We will text you if someone cancels a slot on that day.
@@ -1181,7 +1181,7 @@ export default function BookAppointment() {
                             )}
 
                             <p className="text-sm text-gray-300">
-                              Don&apos;t see your preferred time? Join the Queue, or try a 20-minute service (Kids Cut, Hair Line Up, Beard Trim) if you just need a quick slot.
+                              Don&apos;t see your preferred time? Join the Queue, or try a 30-minute service (Kids Cut, Hair Line Up, Beard Trim) if you just need a quick slot.
                             </p>
                             <div className="mt-6">
                               <Button

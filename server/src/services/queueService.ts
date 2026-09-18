@@ -16,9 +16,9 @@ import { getBusinessTimezone } from '../utils/timezone';
 
 const SWEEP_INTERVAL_MS = 1000 * 60 * 15; // every 15 minutes
 const ADAPTIVE_SERVICE_RULES: Array<{ keywords: string[]; duration: number }> = [
-  { keywords: ['kids cut', 'kid cut'], duration: 20 },
-  { keywords: ['hair line up', 'hair line-up', 'hair lineup', 'lineup'], duration: 20 },
-  { keywords: ['beard trim'], duration: 20 },
+  { keywords: ['kids cut', 'kid cut'], duration: 30 },
+  { keywords: ['hair line up', 'hair line-up', 'hair lineup', 'lineup'], duration: 30 },
+  { keywords: ['beard trim'], duration: 30 },
   { keywords: ['deluxe'], duration: 60 },
 ];
 
