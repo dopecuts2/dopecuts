@@ -842,6 +842,9 @@ export default function BookAppointment() {
                 <p className="text-sm text-gray-400">
                   You will receive an email confirmation within the next few minutes.
                 </p>
+                <p className="text-xs text-gray-500">
+                  Don&apos;t see it in your inbox? Please check your spam/junk folder.
+                </p>
               </div>
             </div>
           </div>
