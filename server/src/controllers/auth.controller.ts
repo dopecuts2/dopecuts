@@ -135,11 +135,13 @@ export const verifyOtpAndLogin = async (req: Request, res: Response) => {
       expiresIn: '7d',
     });
 
-    // Set JWT in an HTTP-Only cookie for security
+    // Set JWT in an HTTP-Only cookie for security.
+    // The admin frontend and this API live on different domains, so the
+    // cookie must be SameSite=None (requires Secure) to be sent cross-site.
     res.cookie('token', token, {
       httpOnly: true,
       secure: IS_PROD,
-      sameSite: 'strict',
+      sameSite: IS_PROD ? 'none' : 'lax',
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     });
 
