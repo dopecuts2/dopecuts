@@ -35,11 +35,18 @@ export const connectDB = async () => {
     logger.info('📦 MongoDB connected successfully');
     
   } catch (error) {
-    
-    logger.error('MongoDB connection failed. Verify the Railway MONGO_URI variable, Atlas network access, and database user permissions.');
-    
+
+    const rawMessage = error instanceof Error ? error.message : String(error);
+    // Strip any credentials that might appear in a connection-string-shaped error message.
+    const safeMessage = rawMessage.replace(/\/\/[^@/\s]+@/g, '//<redacted>@');
+    const errorName = error instanceof Error ? error.name : 'UnknownError';
+
+    logger.error(
+      `MongoDB connection failed [${errorName}]: ${safeMessage}. Verify the Railway MONGO_URI variable, Atlas network access, and database user permissions.`
+    );
+
     throw error;
-    
+
   }
   
 };
