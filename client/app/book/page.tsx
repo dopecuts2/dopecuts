@@ -818,11 +818,27 @@ export default function BookAppointment() {
                     <span className="text-white font-medium">{confirmedBooking.firstName} {confirmedBooking.lastName}</span>
                   </div>
                   {confirmedBooking.additionalGuests && confirmedBooking.additionalGuests.length > 0 && (
-                    <div className="flex justify-between">
-                      <span className="text-gray-300">Additional Booking(s):</span>
-                      <span className="text-white font-medium">
-                        {confirmedBooking.additionalGuests.map((guest) => `${guest.firstName} ${guest.lastName}`).join(', ')}
-                      </span>
+                    <div className="border-t border-gray-600 pt-3 space-y-3">
+                      <span className="text-gray-300 block">Additional Guest(s):</span>
+                      {(confirmedAdditionalBookings.length > 0
+                        ? confirmedAdditionalBookings.map((b) => ({
+                            name: `${b.firstName} ${b.lastName || ''}`.trim(),
+                            serviceName: b.service,
+                            time: b.time,
+                          }))
+                        : confirmedBooking.additionalGuests.map((guest) => ({
+                            name: `${guest.firstName} ${guest.lastName || ''}`.trim(),
+                            serviceName: guest.serviceName,
+                            time: guest.time,
+                          }))
+                      ).map((guest, idx) => (
+                        <div key={`guest-detail-${idx}`} className="flex justify-between text-sm pl-2">
+                          <span className="text-gray-300">{guest.name}</span>
+                          <span className="text-white font-medium text-right">
+                            {guest.serviceName || 'Service'} &middot; {guest.time}
+                          </span>
+                        </div>
+                      ))}
                     </div>
                   )}
                   <div className="flex justify-between border-t border-gray-600 pt-3">

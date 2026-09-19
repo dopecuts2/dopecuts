@@ -262,6 +262,7 @@ export const sendAdminNotificationEmail = async (bookingDetails: IBooking) => {
         <tr><td style="padding: 8px; border: 1px solid #ddd;">Price:</td><td style="padding: 8px; border: 1px solid #ddd;"><strong>$${price}</strong></td></tr>
         ${notes ? `<tr><td style="padding: 8px; border: 1px solid #ddd;">Notes:</td><td style="padding: 8px; border: 1px solid #ddd;">${notes}</td></tr>` : ''}
       </table>
+      ${renderGuestSection(bookingDetails.additionalGuests)}
     </div>
   `;
 
