@@ -74,6 +74,20 @@ function generateTimeOptions(start = '06:00', end = '22:00', intervalMinutes = 2
 const timeOptions = generateTimeOptions();
 
 const DEFAULT_SLOT_DURATION = 45;
+const ISO_WEEKDAY_OFFSET: Record<string, number> = {
+  Monday: 0,
+  Tuesday: 1,
+  Wednesday: 2,
+  Thursday: 3,
+  Friday: 4,
+  Saturday: 5,
+  Sunday: 6,
+};
+
+function dayOfMonthFor(weekStart: string, dayOfWeek: string): string {
+  const offset = ISO_WEEKDAY_OFFSET[dayOfWeek] ?? 0;
+  return moment(weekStart).add(offset, 'days').format('D');
+}
 const STORAGE_SLOT_DURATION = 'admin-calendar-slot-duration';
 const STORAGE_VISUALIZER = 'admin-calendar-visualizer-enabled';
 const MAX_WEEKS = 12;
@@ -823,7 +837,12 @@ export default function CalendarManagement() {
                       }`}
                     >
                       <div className="flex items-center justify-between">
-                        <p className="text-sm font-semibold text-white">{day.dayOfWeek}</p>
+                        <p className="text-sm font-semibold text-white">
+                          {day.dayOfWeek}{' '}
+                          <span className="text-gray-400 font-normal">
+                            {dayOfMonthFor(selectedWeek.weekStart, day.dayOfWeek)}
+                          </span>
+                        </p>
                         <div className="flex items-center gap-2">
                           {!day.isEnabled && (
                             <span className="text-xs text-amber-200 uppercase tracking-wide">
