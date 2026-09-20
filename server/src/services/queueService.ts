@@ -15,19 +15,12 @@ import { normalizePhoneDigits } from '../utils/phone';
 import { getBusinessTimezone } from '../utils/timezone';
 
 const SWEEP_INTERVAL_MS = 1000 * 60 * 15; // every 15 minutes
-const ADAPTIVE_SERVICE_RULES: Array<{ keywords: string[]; duration: number }> = [
-  { keywords: ['kids cut', 'kid cut'], duration: 30 },
-  { keywords: ['hair line up', 'hair line-up', 'hair lineup', 'lineup'], duration: 30 },
-  { keywords: ['beard trim'], duration: 30 },
-  { keywords: ['deluxe'], duration: 60 },
-];
 
-function resolveAdaptiveDuration(serviceName: string | undefined, baseDuration: number) {
-  const normalized = (serviceName || '').toLowerCase();
-  const rule = ADAPTIVE_SERVICE_RULES.find((r) =>
-    r.keywords.some((keyword) => normalized.includes(keyword))
-  );
-  return rule ? rule.duration : baseDuration;
+// The admin now chooses an explicit duration (15/30/45/60 min) per
+// service, so that value is authoritative -- no more inferring duration
+// from the service name.
+function resolveAdaptiveDuration(_serviceName: string | undefined, baseDuration: number) {
+  return baseDuration;
 }
 export interface QueueJoinPayload {
   firstName: string;

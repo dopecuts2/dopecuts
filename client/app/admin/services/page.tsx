@@ -24,6 +24,11 @@ import {
   IService,
 } from '@/lib/api/service';
 
+// The only durations a service can be booked for. Keeping this fixed
+// (rather than free-text) prevents odd values that don't line up with
+// the booking engine's slot cadence.
+const DURATION_OPTIONS = [15, 30, 45, 60];
+
 export default function ServicesManagement() {
   const [services, setServices] = useState<IService[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -190,16 +195,18 @@ export default function ServicesManagement() {
                   <Label htmlFor="duration" className="text-gray-300">
                     Duration (mins)
                   </Label>
-                  <Input
+                  <select
                     id="duration"
-                    type="number"
-                    placeholder="30"
                     value={newService.duration}
                     onChange={(e) => setNewService({ ...newService, duration: e.target.value })}
-                    className="bg-gray-700 border-gray-600 text-white"
-                    min={1}
-                    step={1}
-                  />
+                    className="w-full h-10 rounded-md bg-gray-700 border border-gray-600 text-white px-3"
+                  >
+                    {DURATION_OPTIONS.map((mins) => (
+                      <option key={mins} value={mins}>
+                        {mins} minutes
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
               <div className="flex gap-3 pt-4">
@@ -274,16 +281,18 @@ export default function ServicesManagement() {
                 <Label htmlFor="editDuration" className="text-gray-300">
                   Duration (mins)
                 </Label>
-                <Input
+                <select
                   id="editDuration"
-                  type="number"
-                  placeholder="30"
                   value={newService.duration}
                   onChange={(e) => setNewService({ ...newService, duration: e.target.value })}
-                  className="bg-gray-700 border-gray-600 text-white"
-                  min={1}
-                  step={1}
-                />
+                  className="w-full h-10 rounded-md bg-gray-700 border border-gray-600 text-white px-3"
+                >
+                  {DURATION_OPTIONS.map((mins) => (
+                    <option key={mins} value={mins}>
+                      {mins} minutes
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
             <div className="flex gap-3 pt-4">
