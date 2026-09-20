@@ -1167,10 +1167,15 @@ export default function BookAppointment() {
                                 </p>
                                 <Button
                                   onClick={handleQueueRequest}
-                                  className="w-full bg-white text-black border border-transparent hover:border-blue-400 hover:bg-gray-100 hover:shadow-lg transition-all duration-200"
+                                  className="w-full h-auto py-3 bg-white text-black border border-transparent hover:border-blue-400 hover:bg-gray-100 hover:shadow-lg transition-all duration-200"
                                   disabled={!formData.serviceId}
                                 >
-                                  Join the queue for {formData.date ? moment(formData.date).format('MMMM D') : 'selected day'}
+                                  <span className="flex flex-col items-center leading-tight">
+                                    <span className="font-extrabold text-black">Click here</span>
+                                    <span className="font-extrabold text-black">
+                                      to join queue for {formData.date ? moment(formData.date).format('MMMM D') : 'today'}
+                                    </span>
+                                  </span>
                                 </Button>
                                 <p className="text-xs font-bold text-gray-300">
                                   We will text you if someone cancels a slot on that day.
