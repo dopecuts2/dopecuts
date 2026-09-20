@@ -54,13 +54,6 @@ function getDefaultDayHours(dayOfWeek: string) {
   );
 }
 
-const ADAPTIVE_SERVICE_RULES: Array<{ keywords: string[]; duration: number }> = [
-  { keywords: ['kids cut', 'kid cut'], duration: 30 },
-  { keywords: ['hair line up', 'hair line-up', 'hair lineup', 'lineup'], duration: 30 },
-  { keywords: ['beard trim'], duration: 30 },
-  { keywords: ['deluxe'], duration: 60 },
-];
-
 /**
  * @description Helper to render short SMS line for customers.
  */
@@ -146,19 +139,15 @@ function roundUpToSlot(dt: moment.Moment, slotMinutes: number) {
 }
 
 function resolveAdaptiveDuration(
-  serviceName: string | undefined,
+  _serviceName: string | undefined,
   baseDuration: number,
   slotDuration?: number
 ) {
-  const normalizedSlot = normalizeSlotDuration(slotDuration ?? DEFAULT_SLOT_DURATION);
-  const normalizedBase = baseDuration || normalizedSlot;
-  const normalizedName = (serviceName || '').toLowerCase();
-  const rule = ADAPTIVE_SERVICE_RULES.find((r) =>
-    r.keywords.some((keyword) => normalizedName.includes(keyword))
-  );
-  if (rule) return rule.duration;
-  // Default services should consume at least one full slot; keep longer durations intact.
-  return Math.max(normalizedBase, normalizedSlot);
+  // The admin now chooses an explicit duration (15/30/45/60 min) per
+  // service, so that value is authoritative -- no more inferring/forcing
+  // duration from the service name or flooring it to the slot length.
+  if (baseDuration) return baseDuration;
+  return normalizeSlotDuration(slotDuration ?? DEFAULT_SLOT_DURATION);
 }
 
 function gcd(a: number, b: number): number {

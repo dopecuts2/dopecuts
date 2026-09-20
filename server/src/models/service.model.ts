@@ -15,9 +15,13 @@ const serviceSchema = new Schema<IService>({
     trim: true,
     unique: true 
   },
-  duration: { 
-    type: Number, 
-    required: true 
+  duration: {
+    type: Number,
+    required: true,
+    enum: {
+      values: [15, 30, 45, 60],
+      message: 'Duration must be one of 15, 30, 45, or 60 minutes.',
+    },
   },
   price: { 
     type: Number, 

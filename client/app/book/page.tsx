@@ -84,24 +84,14 @@ function compressSlotsForService(slots: string[], serviceMin: number, slotStepMi
   return slots.filter((_, i) => i % takeEvery === 0);
 }
 
-const ADAPTIVE_SERVICE_RULES: Array<{ keywords: string[]; duration: number }> = [
-  { keywords: ['kids cut', 'kid cut'], duration: 30 },
-  { keywords: ['hair line up', 'hair line-up', 'hair lineup', 'lineup'], duration: 30 },
-  { keywords: ['beard trim'], duration: 30 },
-  { keywords: ['deluxe'], duration: 60 },
-];
-
 const TORONTO_TIMEZONE = 'America/Toronto';
 
+// The admin now chooses an explicit duration (15/30/45/60 min) per
+// service, so that value is authoritative -- no more inferring/forcing
+// duration from the service name.
 function getAdaptiveDuration(service?: IService): number {
   if (!service) return 0;
-  const normalized = (service.name || '').toLowerCase();
-  const rule = ADAPTIVE_SERVICE_RULES.find((r) =>
-    r.keywords.some((keyword) => normalized.includes(keyword))
-  );
-  // Default services should be at least one 45-minute slot.
-  if (rule) return rule.duration;
-  return Math.max(service.duration, 45);
+  return service.duration;
 }
 
 /** Find the slotDuration for the selected date from calendar settings */

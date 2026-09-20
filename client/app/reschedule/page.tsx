@@ -52,23 +52,13 @@ import { getAvailability } from '@/lib/api/calendar';
 
 // --- Helpers ---
 
-const ADAPTIVE_SERVICE_RULES: Array<{ keywords: string[]; duration: number }> = [
-  { keywords: ['kids cut', 'kid cut'], duration: 30 },
-  { keywords: ['hair line up', 'hair line-up', 'hair lineup', 'lineup'], duration: 30 },
-  { keywords: ['beard trim'], duration: 30 },
-  { keywords: ['deluxe'], duration: 60 },
-];
-
 const DEFAULT_SLOT_DURATION = 45;
 
-function getAdaptiveDuration(serviceName?: string, baseDuration?: number) {
-  const normalizedName = (serviceName || '').toLowerCase();
-  const rule = ADAPTIVE_SERVICE_RULES.find((r) =>
-    r.keywords.some((keyword) => normalizedName.includes(keyword))
-  );
-  if (rule) return rule.duration;
-  const normalizedBase = baseDuration || DEFAULT_SLOT_DURATION;
-  return Math.max(normalizedBase, DEFAULT_SLOT_DURATION);
+// The admin now chooses an explicit duration (15/30/45/60 min) per
+// service, so that value is authoritative -- no more inferring/forcing
+// duration from the service name.
+function getAdaptiveDuration(_serviceName?: string, baseDuration?: number) {
+  return baseDuration || DEFAULT_SLOT_DURATION;
 }
 
 // Generate available dates (2 weeks in advance, skipping Sundays)
