@@ -62,13 +62,12 @@ function computeSlotStep(slotDuration: number, serviceDuration: number) {
 
   if (service === baseSlot) return baseSlot;
 
-  // If the service is shorter, use a shared divisor so it still gets a
-  // tighter cadence even when it doesn't divide the base slot evenly
-  // (e.g., 30 min inside a 45-min base -> 15-min cadence).
+  // If the service is shorter than the base slot, offer start times
+  // spaced by the service's own duration (its explicit, admin-chosen
+  // value), rather than a derived/finer cadence that wouldn't match
+  // what was configured for the service.
   if (service < baseSlot) {
-    const divisor = gcd(baseSlot, service);
-    if (divisor >= 5) return divisor;
-    return baseSlot;
+    return service;
   }
 
   if (service > baseSlot) {
