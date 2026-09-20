@@ -83,6 +83,10 @@ const ISO_WEEKDAY_OFFSET: Record<string, number> = {
   Saturday: 5,
   Sunday: 6,
 };
+// Display-only order (Monday-first, Sunday last) so the list reads
+// chronologically alongside the day-of-month numbers. The underlying
+// data array keeps its original order; only rendering is reordered.
+const DISPLAY_DAY_ORDER = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
 function dayOfMonthFor(weekStart: string, dayOfWeek: string): string {
   const offset = ISO_WEEKDAY_OFFSET[dayOfWeek] ?? 0;
@@ -827,7 +831,14 @@ export default function CalendarManagement() {
                   </p>
                 </div>
                 <div className="grid gap-3">
-                  {selectedWeek.days.map((day, dayIndex) => (
+                  {selectedWeek.days
+                    .map((day, dayIndex) => ({ day, dayIndex }))
+                    .sort(
+                      (a, b) =>
+                        DISPLAY_DAY_ORDER.indexOf(a.day.dayOfWeek) -
+                        DISPLAY_DAY_ORDER.indexOf(b.day.dayOfWeek)
+                    )
+                    .map(({ day, dayIndex }) => (
                     <div
                       key={`${selectedWeek.weekStart}-${day.dayOfWeek}`}
                       className={`rounded-xl p-3 space-y-3 border transition ${
