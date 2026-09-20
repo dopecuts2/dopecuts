@@ -25,7 +25,7 @@ const notificationSettingsSchema = new Schema<INotificationSettings>({
   siteNoticeMessage: { type: String, default: '' },
   productNoticeEnabled: { type: Boolean, required: true, default: false },
   productNoticeMessage: { type: String, default: '' },
-  calendarWeeks: { type: Number, required: true, default: 4, min: 1, max: 12 },
+  calendarWeeks: { type: Number, required: true, default: 3, min: 1, max: 12 },
 }, { timestamps: true });
 
 // Removed duplicate index - 'unique: true' on the field already creates an index

@@ -91,7 +91,7 @@ export default function CalendarManagement() {
     message: '',
     isError: false,
   });
-  const [weeksToShow, setWeeksToShow] = useState(4);
+  const [weeksToShow, setWeeksToShow] = useState(3);
   const [startDate, setStartDate] = useState(moment().startOf('isoWeek').format('YYYY-MM-DD'));
   const [defaultSlotDuration, setDefaultSlotDuration] = useState<number>(DEFAULT_SLOT_DURATION);
   const [isSaving, setIsSaving] = useState(false);

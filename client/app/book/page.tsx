@@ -126,7 +126,7 @@ export default function BookAppointment() {
   const [calendarSettings, setCalendarSettings] = useState<ICalendarSettings[]>([]);
   const [availableDates, setAvailableDates] = useState<AvailableDate[]>([]);
   const [weeklySchedules, setWeeklySchedules] = useState<IWeeklyCalendar[]>([]);
-  const [weeksToShow, setWeeksToShow] = useState(4);
+  const [weeksToShow, setWeeksToShow] = useState(3);
   const [currentWeekIdx, setCurrentWeekIdx] = useState(0);
   const [businessTimezone, setBusinessTimezone] = useState<string>(TORONTO_TIMEZONE);
   const [timeSlots, setTimeSlots] = useState<string[]>([]);
@@ -336,10 +336,10 @@ export default function BookAppointment() {
         const [servicesResponse, settingsResponse, weeksSetting, timezoneResponse] = await Promise.all([
           getAllServices(),
           getCalendarSettings(),
-          getCalendarWeeks().catch(() => ({ weeks: 4 })),
+          getCalendarWeeks().catch(() => ({ weeks: 3 })),
           getCalendarTimezone().catch(() => ({ timezone: moment.tz.guess() })),
         ]);
-        const weeksValue = Math.min(12, Math.max(1, weeksSetting?.weeks || 4));
+        const weeksValue = Math.min(12, Math.max(1, weeksSetting?.weeks || 3));
         setWeeksToShow(weeksValue);
         const weeklyData = await getWeeklyCalendar(weeksValue);
         const tzValue =

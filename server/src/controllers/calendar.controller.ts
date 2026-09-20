@@ -12,6 +12,27 @@ const DEFAULT_END_TIME = '19:00';
 const DEFAULT_SLOT_DURATION = 45;
 const DAY_ORDER = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
+// Per-weekday defaults used whenever a day hasn't been explicitly
+// configured (either via Weekly Availability for that specific week, or
+// via the day-of-week template). Days not listed here fall back to the
+// generic DEFAULT_START_TIME/DEFAULT_END_TIME above.
+const DEFAULT_DAY_HOURS: Record<string, { startTime: string; endTime: string; isEnabled: boolean }> = {
+  Sunday: { startTime: DEFAULT_START_TIME, endTime: DEFAULT_END_TIME, isEnabled: false },
+  Monday: { startTime: '11:00', endTime: '16:40', isEnabled: true },
+  Tuesday: { startTime: '11:00', endTime: '16:40', isEnabled: true },
+  Saturday: { startTime: '09:20', endTime: '17:20', isEnabled: true },
+};
+
+function getDefaultDayHours(dayOfWeek: string) {
+  return (
+    DEFAULT_DAY_HOURS[dayOfWeek] || {
+      startTime: DEFAULT_START_TIME,
+      endTime: DEFAULT_END_TIME,
+      isEnabled: true,
+    }
+  );
+}
+
 const ADAPTIVE_SERVICE_RULES: Array<{ keywords: string[]; duration: number }> = [
   { keywords: ['kids cut', 'kid cut'], duration: 30 },
   { keywords: ['hair line up', 'hair line-up', 'hair lineup', 'lineup'], duration: 30 },
@@ -91,14 +112,17 @@ interface WeeklyCalendarPayload {
   slotDuration: number;
 }
 
-const buildDefaultDay = (dayOfWeek: string): WeeklyDayPayload => ({
-  dayOfWeek,
-  startTime: DEFAULT_START_TIME,
-  endTime: DEFAULT_END_TIME,
-  slotDuration: DEFAULT_SLOT_DURATION,
-  isEnabled: true,
-  blockedTimes: [],
-});
+const buildDefaultDay = (dayOfWeek: string): WeeklyDayPayload => {
+  const defaults = getDefaultDayHours(dayOfWeek);
+  return {
+    dayOfWeek,
+    startTime: defaults.startTime,
+    endTime: defaults.endTime,
+    slotDuration: DEFAULT_SLOT_DURATION,
+    isEnabled: defaults.isEnabled,
+    blockedTimes: [],
+  };
+};
 
 const buildDefaultWeek = (weekStart: string): WeeklyCalendarPayload => ({
   weekStart,
@@ -132,7 +156,7 @@ async function getDaySettingsFor(dateISO: string, timezone: string) {
   const weekly = await WeeklyCalendar.findOne({ weekStart });
   if (weekly) {
     const day = weekly.days.find((d) => d.dayOfWeek === dayOfWeek);
-    if (day && day.isEnabled) {
+    if (day) {
       return {
         startTime: day.startTime,
         endTime: day.endTime,
@@ -154,12 +178,13 @@ async function getDaySettingsFor(dateISO: string, timezone: string) {
     };
   }
 
+  const defaults = getDefaultDayHours(dayOfWeek);
   return {
-    startTime: DEFAULT_START_TIME,
-    endTime: DEFAULT_END_TIME,
+    startTime: defaults.startTime,
+    endTime: defaults.endTime,
     slotDuration: DEFAULT_SLOT_DURATION,
     breaks: [],
-    isEnabled: true,
+    isEnabled: defaults.isEnabled,
   };
 }
 
@@ -253,12 +278,13 @@ export const getCalendarSettings = async (_req: Request, res: Response) => {
           slotDuration: normalizeSlotDuration(existing.slotDuration),
         };
       }
+      const defaults = getDefaultDayHours(dayOfWeek);
       return {
         dayOfWeek,
-        startTime: DEFAULT_START_TIME,
-        endTime: DEFAULT_END_TIME,
+        startTime: defaults.startTime,
+        endTime: defaults.endTime,
         slotDuration: DEFAULT_SLOT_DURATION,
-        isEnabled: true,
+        isEnabled: defaults.isEnabled,
         breaks: [],
       };
     });
