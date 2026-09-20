@@ -55,7 +55,7 @@ export default function Settings() {
   const [productNoticeMessage, setProductNoticeMessage] = useState('');
   const [visualizerEnabled, setVisualizerEnabled] = useState(true);
   const [calendarStart, setCalendarStart] = useState(moment().startOf('isoWeek').format('YYYY-MM-DD'));
-  const [calendarWeeks, setCalendarWeeks] = useState(4);
+  const [calendarWeeks, setCalendarWeeks] = useState(3);
   const [calendarSlotDuration, setCalendarSlotDuration] = useState<number>(DEFAULT_SLOT_DURATION);
   const [calendarSaving, setCalendarSaving] = useState(false);
   const [calendarSavedAt, setCalendarSavedAt] = useState<number | null>(null);

@@ -110,7 +110,7 @@ export const getProductNotice = async (_req: Request, res: Response) => {
 export const getCalendarWeeks = async (_req: Request, res: Response) => {
   try {
     const settings = await getNotificationSettings();
-    res.status(200).json({ weeks: settings.calendarWeeks || 4 });
+    res.status(200).json({ weeks: settings.calendarWeeks || 3 });
   } catch (err) {
     logger.error('Error fetching calendar weeks:', err);
     res.status(500).json({ message: 'Failed to fetch calendar weeks.' });

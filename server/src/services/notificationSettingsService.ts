@@ -24,7 +24,7 @@ export async function getNotificationSettings(): Promise<INotificationSettings> 
       siteNoticeMessage: '',
       productNoticeEnabled: false,
       productNoticeMessage: '',
-      calendarWeeks: 4,
+      calendarWeeks: 3,
     });
   } else {
     let mutated = false;
@@ -49,7 +49,7 @@ export async function getNotificationSettings(): Promise<INotificationSettings> 
       mutated = true;
     }
     if (doc.calendarWeeks === undefined) {
-      doc.calendarWeeks = 4;
+      doc.calendarWeeks = 3;
       mutated = true;
     }
     if (mutated) await doc.save();
