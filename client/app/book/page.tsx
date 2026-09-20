@@ -400,12 +400,12 @@ export default function BookAppointment() {
     setGuestSlotsLoading({});
   }, [formData.date, formData.serviceId]);
 
-  // --- Scroll to top whenever step changes ---
+  // --- Scroll to top whenever step changes, or a confirmation screen appears ---
   useEffect(() => {
     if (typeof window !== 'undefined') {
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
-  }, [step]);
+  }, [step, confirmedBooking, queueConfirmation]);
 
   const needsPrepay = cancellationCount >= 3;
   const isQueueFlow = Boolean(queueRequestedDate);
@@ -1199,21 +1199,25 @@ export default function BookAppointment() {
                               </div>
                             )}
 
-                            <p className="text-sm text-gray-300">
-                              Don&apos;t see your preferred time? Join the Queue, or try a 30-minute service (Kids Cut, Hair Line Up, Beard Trim) if you just need a quick slot.
-                            </p>
-                            <div className="mt-6">
-                              <Button
-                                onClick={handleQueueRequest}
-                                className="w-full bg-white text-black border border-transparent hover:border-blue-400 hover:bg-gray-100 hover:shadow-lg transition-all duration-200"
-                                disabled={!formData.serviceId}
-                              >
-                                Join the queue for {formData.date ? moment(formData.date).format('MMMM D') : 'selected day'}
-                              </Button>
-                              <p className="text-xs text-gray-400 mt-1">
-                                We will text you if someone cancels a slot for this day
-                              </p>
-                            </div>
+                            {timeSlots.length === 0 && (
+                              <>
+                                <p className="text-sm text-gray-300">
+                                  Don&apos;t see your preferred time? Join the Queue, or try a 30-minute service (Kids Cut, Hair Line Up, Beard Trim) if you just need a quick slot.
+                                </p>
+                                <div className="mt-6">
+                                  <Button
+                                    onClick={handleQueueRequest}
+                                    className="w-full bg-white text-black border border-transparent hover:border-blue-400 hover:bg-gray-100 hover:shadow-lg transition-all duration-200"
+                                    disabled={!formData.serviceId}
+                                  >
+                                    Join the queue for {formData.date ? moment(formData.date).format('MMMM D') : 'selected day'}
+                                  </Button>
+                                  <p className="text-xs text-gray-400 mt-1">
+                                    We will text you if someone cancels a slot for this day
+                                  </p>
+                                </div>
+                              </>
+                            )}
                           </div>
                         )
                       )}
