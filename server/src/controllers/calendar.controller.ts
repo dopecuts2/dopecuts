@@ -86,6 +86,56 @@ function normalizeSlotDuration(duration?: number | null) {
   return duration;
 }
 
+interface TimeInterval {
+  start: moment.Moment;
+  end: moment.Moment;
+}
+
+/**
+ * Merge a list of occupied intervals (clamped to [dayStart, dayEnd]) and
+ * return the free gaps between them, in chronological order. This is the
+ * basis of "gap-based" availability: rather than walking a fixed clock
+ * grid and discarding any tick that overlaps a booking, we work out the
+ * actual free windows first, so a slot can start right where the
+ * previous booking ends (e.g. 2:45) instead of only at grid marks.
+ */
+function computeFreeGaps(
+  dayStart: moment.Moment,
+  dayEnd: moment.Moment,
+  occupied: TimeInterval[]
+): TimeInterval[] {
+  const clamped = occupied
+    .map((iv) => ({
+      start: moment.max(iv.start, dayStart),
+      end: moment.min(iv.end, dayEnd),
+    }))
+    .filter((iv) => iv.start.isBefore(iv.end))
+    .sort((a, b) => a.start.valueOf() - b.start.valueOf());
+
+  const merged: TimeInterval[] = [];
+  for (const iv of clamped) {
+    const last = merged[merged.length - 1];
+    if (last && !iv.start.isAfter(last.end)) {
+      if (iv.end.isAfter(last.end)) last.end = iv.end;
+    } else {
+      merged.push({ start: iv.start.clone(), end: iv.end.clone() });
+    }
+  }
+
+  const gaps: TimeInterval[] = [];
+  let cursor = dayStart.clone();
+  for (const iv of merged) {
+    if (iv.start.isAfter(cursor)) {
+      gaps.push({ start: cursor.clone(), end: iv.start.clone() });
+    }
+    if (iv.end.isAfter(cursor)) cursor = iv.end.clone();
+  }
+  if (cursor.isBefore(dayEnd)) {
+    gaps.push({ start: cursor.clone(), end: dayEnd.clone() });
+  }
+  return gaps;
+}
+
 interface WeeklyDayPayload {
   dayOfWeek: string;
   startTime: string;
@@ -357,58 +407,43 @@ export const getAvailability = async (req: Request, res: Response) => {
     const endTime = moment.tz(`${dateISO} ${settings.endTime}`, 'YYYY-MM-DD HH:mm', timezone);
 
     const slotStep = computeSlotStep(settings.slotDuration, effectiveDuration);
-    let current = startTime.clone();
-
-    const availableSlots: string[] = [];
     const isToday = nowInTz.format('YYYY-MM-DD') === dateISO;
 
-    if (isToday && nowInTz.isAfter(current)) {
-      const minutes = nowInTz.minute();
-      const remainder = minutes % slotStep;
-      current = nowInTz
-        .clone()
-        .add(remainder === 0 ? 0 : slotStep - remainder, 'minutes')
-        .seconds(0)
-        .milliseconds(0);
-      if (current.isBefore(startTime)) current = startTime.clone();
+    const occupied: TimeInterval[] = [];
+    for (const b of bookingsOnDate) {
+      const bStart = moment.tz(`${dateISO} ${b.time}`, 'YYYY-MM-DD h:mm A', timezone);
+      const bEnd = bStart.clone().add(b.duration, 'minutes');
+      occupied.push({ start: bStart, end: bEnd });
+    }
+    for (const block of settings.breaks || []) {
+      const blockStart = moment.tz(`${dateISO} ${block.startTime}`, 'YYYY-MM-DD HH:mm', timezone);
+      const blockEnd = moment.tz(`${dateISO} ${block.endTime}`, 'YYYY-MM-DD HH:mm', timezone);
+      occupied.push({ start: blockStart, end: blockEnd });
     }
 
-    const overlaps = (aStart: moment.Moment, aEnd: moment.Moment, bStart: moment.Moment, bEnd: moment.Moment) =>
-      aStart.isBefore(bEnd) && aEnd.isAfter(bStart);
+    const gaps = computeFreeGaps(startTime, endTime, occupied);
+    const availableSlots: string[] = [];
 
-    while (current.isBefore(endTime)) {
-      const slotStart = current.clone();
-      const slotEnd = slotStart.clone().add(effectiveDuration, 'minutes');
-      if (slotEnd.isAfter(endTime)) break;
+    for (const gap of gaps) {
+      let candidate = gap.start.clone();
 
-      let ok = true;
-      for (const b of bookingsOnDate) {
-        const bStart = moment.tz(`${dateISO} ${b.time}`, 'YYYY-MM-DD h:mm A', timezone);
-        const bEnd = bStart.clone().add(b.duration, 'minutes');
-        if (overlaps(slotStart, slotEnd, bStart, bEnd)) {
-          ok = false;
-          break;
-        }
-      }
-      if (!ok) {
-        current.add(slotStep, 'minutes');
-        continue;
+      if (isToday && nowInTz.isAfter(candidate)) {
+        const minutes = nowInTz.minute();
+        const remainder = minutes % slotStep;
+        const rounded = nowInTz
+          .clone()
+          .add(remainder === 0 ? 0 : slotStep - remainder, 'minutes')
+          .seconds(0)
+          .milliseconds(0);
+        if (rounded.isAfter(candidate)) candidate = rounded;
       }
 
-      for (const block of settings.breaks || []) {
-        const blockStart = moment.tz(`${dateISO} ${block.startTime}`, 'YYYY-MM-DD HH:mm', timezone);
-        const blockEnd = moment.tz(`${dateISO} ${block.endTime}`, 'YYYY-MM-DD HH:mm', timezone);
-        if (overlaps(slotStart, slotEnd, blockStart, blockEnd)) {
-          ok = false;
-          break;
-        }
+      while (true) {
+        const candidateEnd = candidate.clone().add(effectiveDuration, 'minutes');
+        if (candidateEnd.isAfter(gap.end)) break;
+        availableSlots.push(candidate.format('h:mm A'));
+        candidate = candidate.clone().add(slotStep, 'minutes');
       }
-
-      if (ok) {
-        availableSlots.push(slotStart.format('h:mm A'));
-      }
-
-      current.add(slotStep, 'minutes');
     }
 
     res.status(200).json(availableSlots);

@@ -234,6 +234,56 @@ async function getDaySettingsFor(dateISO: string, timezone: string) {
   };
 }
 
+interface TimeInterval {
+  start: moment.Moment;
+  end: moment.Moment;
+}
+
+/**
+ * Merge a list of occupied intervals (clamped to [dayStart, dayEnd]) and
+ * return the free gaps between them, in chronological order. This is the
+ * basis of "gap-based" availability: rather than walking a fixed clock
+ * grid and discarding any tick that overlaps a booking, we work out the
+ * actual free windows first, so a slot can start right where the
+ * previous booking ends (e.g. 2:45) instead of only at grid marks.
+ */
+function computeFreeGaps(
+  dayStart: moment.Moment,
+  dayEnd: moment.Moment,
+  occupied: TimeInterval[]
+): TimeInterval[] {
+  const clamped = occupied
+    .map((iv) => ({
+      start: moment.max(iv.start, dayStart),
+      end: moment.min(iv.end, dayEnd),
+    }))
+    .filter((iv) => iv.start.isBefore(iv.end))
+    .sort((a, b) => a.start.valueOf() - b.start.valueOf());
+
+  const merged: TimeInterval[] = [];
+  for (const iv of clamped) {
+    const last = merged[merged.length - 1];
+    if (last && !iv.start.isAfter(last.end)) {
+      if (iv.end.isAfter(last.end)) last.end = iv.end;
+    } else {
+      merged.push({ start: iv.start.clone(), end: iv.end.clone() });
+    }
+  }
+
+  const gaps: TimeInterval[] = [];
+  let cursor = dayStart.clone();
+  for (const iv of merged) {
+    if (iv.start.isAfter(cursor)) {
+      gaps.push({ start: cursor.clone(), end: iv.start.clone() });
+    }
+    if (iv.end.isAfter(cursor)) cursor = iv.end.clone();
+  }
+  if (cursor.isBefore(dayEnd)) {
+    gaps.push({ start: cursor.clone(), end: dayEnd.clone() });
+  }
+  return gaps;
+}
+
 function computeAvailableSlots(
   dateISO: string,
   serviceDuration: number,
@@ -258,55 +308,40 @@ function computeAvailableSlots(
   const dayStart = moment.tz(`${dateISO} ${startTime}`, 'YYYY-MM-DD HH:mm', timezone);
   const dayEnd = moment.tz(`${dateISO} ${endTime}`, 'YYYY-MM-DD HH:mm', timezone);
 
-  // Start from either dayStart or rounded-up "now" if today
-  let current = dayStart.clone();
-  const isToday = nowInTz.format('YYYY-MM-DD') === dateISO;
-  if (isToday && nowInTz.isAfter(current)) {
-    current = roundUpToSlot(nowInTz.clone(), slotStep);
-    if (current.isBefore(dayStart)) current = dayStart.clone();
+  const occupied: TimeInterval[] = [];
+  for (const b of bookingsOnDate) {
+    if (b.status === 'cancelled') continue;
+    const bStart = moment.tz(`${dateISO} ${b.time}`, 'YYYY-MM-DD h:mm A', timezone);
+    const bEnd = bStart.clone().add(b.duration, 'minutes');
+    occupied.push({ start: bStart, end: bEnd });
+  }
+  for (const brk of breaks || []) {
+    const brkStart = moment.tz(`${dateISO} ${brk.startTime}`, 'YYYY-MM-DD HH:mm', timezone);
+    const brkEnd = moment.tz(`${dateISO} ${brk.endTime}`, 'YYYY-MM-DD HH:mm', timezone);
+    occupied.push({ start: brkStart, end: brkEnd });
   }
 
+  const gaps = computeFreeGaps(dayStart, dayEnd, occupied);
+  const isToday = nowInTz.format('YYYY-MM-DD') === dateISO;
   const available: string[] = [];
 
-  while (current.isBefore(dayEnd)) {
-    const slotStart = current.clone();
-    const slotEnd = slotStart.clone().add(serviceDuration, 'minutes');
+  for (const gap of gaps) {
+    let candidate = gap.start.clone();
 
-    // If service doesn't fit before close, stop.
-    if (slotEnd.isAfter(dayEnd)) break;
-
-    let ok = true;
-
-    // Overlap with existing non-cancelled bookings
-    for (const b of bookingsOnDate) {
-      if (b.status === 'cancelled') continue;
-      const bStart = moment.tz(`${dateISO} ${b.time}`, 'YYYY-MM-DD h:mm A', timezone);
-      const bEnd = bStart.clone().add(b.duration, 'minutes');
-      if (rangesOverlap(slotStart, slotEnd, bStart, bEnd)) {
-        ok = false;
-        break;
-      }
-    }
-    if (!ok) {
-      current.add(slotStep, 'minutes');
-      continue;
+    // Don't offer times that have already passed today.
+    if (isToday && nowInTz.isAfter(candidate)) {
+      const rounded = roundUpToSlot(nowInTz.clone(), slotStep);
+      if (rounded.isAfter(candidate)) candidate = rounded;
     }
 
-    // Overlap with breaks
-    for (const brk of breaks || []) {
-      const brkStart = moment.tz(`${dateISO} ${brk.startTime}`, 'YYYY-MM-DD HH:mm', timezone);
-      const brkEnd = moment.tz(`${dateISO} ${brk.endTime}`, 'YYYY-MM-DD HH:mm', timezone);
-      if (rangesOverlap(slotStart, slotEnd, brkStart, brkEnd)) {
-        ok = false;
-        break;
-      }
+    // Walk forward within this gap only, stepping by the service's own
+    // cadence, until the service no longer fits before the gap ends.
+    while (true) {
+      const candidateEnd = candidate.clone().add(serviceDuration, 'minutes');
+      if (candidateEnd.isAfter(gap.end)) break;
+      available.push(candidate.format('h:mm A'));
+      candidate = candidate.clone().add(slotStep, 'minutes');
     }
-
-    if (ok) {
-      available.push(slotStart.format('h:mm A'));
-    }
-
-    current.add(slotStep, 'minutes');
   }
 
   return available;
