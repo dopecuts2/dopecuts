@@ -1,6 +1,6 @@
 // dopekuts/app/admin/contact/page.tsx
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Card,
   CardContent,
@@ -41,15 +41,111 @@ import {
   ArrowUpDown,
   Pencil,
   AlertTriangle,
+  Upload,
 } from 'lucide-react';
 import {
   getAllContacts,
   createContact,
   updateContact,
   deleteContact,
+  bulkImportContacts,
   IContact,
   ContactData,
+  BulkImportContactRow,
+  BulkImportResult,
 } from '../../../lib/api/contact';
+
+// --- CSV parsing helpers (dependency-free, handles quoted fields) ---
+
+function parseCSV(text: string): string[][] {
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let field = '';
+  let inQuotes = false;
+
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i];
+    const next = text[i + 1];
+
+    if (inQuotes) {
+      if (char === '"' && next === '"') {
+        field += '"';
+        i++;
+      } else if (char === '"') {
+        inQuotes = false;
+      } else {
+        field += char;
+      }
+    } else if (char === '"') {
+      inQuotes = true;
+    } else if (char === ',') {
+      row.push(field);
+      field = '';
+    } else if (char === '\r') {
+      // ignore, \n handles the line break
+    } else if (char === '\n') {
+      row.push(field);
+      rows.push(row);
+      row = [];
+      field = '';
+    } else {
+      field += char;
+    }
+  }
+  if (field.length > 0 || row.length > 0) {
+    row.push(field);
+    rows.push(row);
+  }
+
+  return rows.filter((r) => r.some((cell) => cell.trim() !== ''));
+}
+
+function findColumnIndex(headers: string[], keywords: string[]): number {
+  const lower = headers.map((h) => h.toLowerCase().trim());
+  for (const kw of keywords) {
+    const idx = lower.findIndex((h) => h === kw);
+    if (idx !== -1) return idx;
+  }
+  for (const kw of keywords) {
+    const idx = lower.findIndex((h) => h.includes(kw));
+    if (idx !== -1) return idx;
+  }
+  return -1;
+}
+
+// Flexibly maps common export formats (plain "Name/Phone/Email" sheets,
+// Google Contacts exports, split first/last name columns, etc.) into the
+// shape the bulk-import endpoint expects.
+function buildContactRows(rows: string[][]): BulkImportContactRow[] {
+  if (rows.length < 2) return [];
+
+  const headers = rows[0];
+  const nameIdx = findColumnIndex(headers, ['full name', 'name', 'contact name']);
+  const firstNameIdx = findColumnIndex(headers, ['first name']);
+  const lastNameIdx = findColumnIndex(headers, ['last name']);
+  const phoneIdx = findColumnIndex(headers, ['phone 1 - value', 'phone number', 'phone', 'mobile']);
+  const emailIdx = findColumnIndex(headers, ['e-mail 1 - value', 'email address', 'email', 'e-mail']);
+
+  const contacts: BulkImportContactRow[] = [];
+
+  for (const r of rows.slice(1)) {
+    const phone = phoneIdx !== -1 ? (r[phoneIdx] || '').trim() : '';
+    if (!phone) continue;
+
+    let name = nameIdx !== -1 ? (r[nameIdx] || '').trim() : '';
+    if (!name && (firstNameIdx !== -1 || lastNameIdx !== -1)) {
+      const first = firstNameIdx !== -1 ? (r[firstNameIdx] || '').trim() : '';
+      const last = lastNameIdx !== -1 ? (r[lastNameIdx] || '').trim() : '';
+      name = [first, last].filter(Boolean).join(' ');
+    }
+
+    const email = emailIdx !== -1 ? (r[emailIdx] || '').trim() : '';
+
+    contacts.push({ name: name || 'Customer', phone, email: email || undefined });
+  }
+
+  return contacts;
+}
 
 // The component's internal representation of a customer
 interface Customer {
@@ -135,6 +231,11 @@ export default function ContactManagement() {
   const [customerToDelete, setCustomerToDelete] = useState<Customer | null>(
     null
   );
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isImporting, setIsImporting] = useState(false);
+  const [importResult, setImportResult] = useState<BulkImportResult | null>(null);
+  const [isImportResultOpen, setIsImportResultOpen] = useState(false);
 
   const fetchContacts = async () => {
     try {
@@ -244,6 +345,38 @@ export default function ContactManagement() {
     setIsDeleteDialogOpen(true);
   };
 
+  const handleImportClick = () => fileInputRef.current?.click();
+
+  const handleFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ''; // allow re-selecting the same file again later
+    if (!file) return;
+
+    setError(null);
+
+    try {
+      const text = await file.text();
+      const rows = parseCSV(text);
+      const contacts = buildContactRows(rows);
+
+      if (contacts.length === 0) {
+        setError('Could not find any rows with a phone number in that file. Make sure it has a "Phone" column.');
+        return;
+      }
+
+      setIsImporting(true);
+      const result = await bulkImportContacts(contacts);
+      setImportResult(result);
+      setIsImportResultOpen(true);
+      await fetchContacts();
+    } catch (err) {
+      console.error('Failed to import contacts:', err);
+      setError('Failed to import contacts. Please check the file and try again.');
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
   const handleConfirmDelete = async () => {
     if (!customerToDelete) return;
     try {
@@ -269,13 +402,31 @@ export default function ContactManagement() {
             Manage DopeCuts customers
           </p>
         </div>
-        <Button
-          onClick={handleOpenAddDialog}
-          className="bg-white text-black hover:bg-gray-200 w-full sm:w-auto"
-        >
-          <UserPlus className="h-4 w-4 mr-2" />
-          Add New Customer
-        </Button>
+        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+          <input
+            type="file"
+            accept=".csv,text/csv"
+            ref={fileInputRef}
+            onChange={handleFileSelected}
+            className="hidden"
+          />
+          <Button
+            onClick={handleImportClick}
+            disabled={isImporting}
+            variant="outline"
+            className="w-full sm:w-auto border-gray-600 text-black hover:bg-gray-700 hover:text-white"
+          >
+            <Upload className="h-4 w-4 mr-2" />
+            {isImporting ? 'Importing...' : 'Import Contacts (CSV)'}
+          </Button>
+          <Button
+            onClick={handleOpenAddDialog}
+            className="bg-white text-black hover:bg-gray-200 w-full sm:w-auto"
+          >
+            <UserPlus className="h-4 w-4 mr-2" />
+            Add New Customer
+          </Button>
+        </div>
       </div>
 
       <Dialog open={isFormDialogOpen} onOpenChange={setIsFormDialogOpen}>
@@ -377,6 +528,57 @@ export default function ContactManagement() {
               </Button>
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isImportResultOpen} onOpenChange={setIsImportResultOpen}>
+        <DialogContent className="bg-gray-800 border-gray-700 text-white max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="text-white">Import Results</DialogTitle>
+            <DialogDescription className="text-gray-400">
+              {importResult
+                ? `Processed ${importResult.total} row${importResult.total === 1 ? '' : 's'} from your file.`
+                : ''}
+            </DialogDescription>
+          </DialogHeader>
+          {importResult && (
+            <div className="space-y-3 mt-2">
+              <div className="grid grid-cols-3 gap-3 text-center">
+                <div className="bg-gray-700 rounded-md p-3">
+                  <p className="text-2xl font-bold text-white">{importResult.created}</p>
+                  <p className="text-xs text-gray-400">New customers added</p>
+                </div>
+                <div className="bg-gray-700 rounded-md p-3">
+                  <p className="text-2xl font-bold text-white">{importResult.updated}</p>
+                  <p className="text-xs text-gray-400">Existing updated</p>
+                </div>
+                <div className="bg-gray-700 rounded-md p-3">
+                  <p className="text-2xl font-bold text-white">{importResult.skipped}</p>
+                  <p className="text-xs text-gray-400">Skipped</p>
+                </div>
+              </div>
+              {importResult.errors.length > 0 && (
+                <div className="max-h-48 overflow-y-auto text-sm bg-gray-900/50 rounded-md p-3 space-y-1">
+                  {importResult.errors.slice(0, 50).map((err, idx) => (
+                    <p key={idx} className="text-gray-300">
+                      Row {err.row}: {err.reason}
+                    </p>
+                  ))}
+                  {importResult.errors.length > 50 && (
+                    <p className="text-gray-500">...and {importResult.errors.length - 50} more.</p>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+          <DialogFooter className="mt-4">
+            <Button
+              onClick={() => setIsImportResultOpen(false)}
+              className="bg-white text-black hover:bg-gray-200"
+            >
+              Close
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 

@@ -61,6 +61,29 @@ export async function deleteContact(id: string): Promise<{ message: string }> {
     return response.data;
 }
 
+export interface BulkImportContactRow {
+    name: string;
+    phone: string;
+    email?: string;
+}
+
+export interface BulkImportResult {
+    total: number;
+    created: number;
+    updated: number;
+    skipped: number;
+    errors: Array<{ row: number; reason: string; input: unknown }>;
+}
+
+/**
+ * Bulk-import contacts (e.g. from an exported customer list).
+ * @access Private (Admin only)
+ */
+export async function bulkImportContacts(contacts: BulkImportContactRow[]): Promise<BulkImportResult> {
+    const response = await apiClient.post<BulkImportResult>('/contacts/bulk-import', { contacts });
+    return response.data;
+}
+
 export interface IContactLookup {
   name: string;
   firstName: string;

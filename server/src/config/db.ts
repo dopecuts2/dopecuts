@@ -3,6 +3,7 @@ import mongoose from 'mongoose';
 import { MONGO_URI } from './env';
 
 import { logger } from '../utils/logger';
+import { Contact } from '../models/contact.model';
 
 
 
@@ -33,7 +34,17 @@ export const connectDB = async () => {
     });
     
     logger.info('📦 MongoDB connected successfully');
-    
+
+    // Bring the live indexes in line with the current schema (e.g. the
+    // Contact.email unique index becoming sparse so contacts without an
+    // email no longer collide with each other). Non-fatal: if this fails
+    // for any reason, the server should still start.
+    try {
+      await Contact.syncIndexes();
+    } catch (indexError) {
+      logger.error('Failed to sync Contact indexes:', indexError);
+    }
+
   } catch (error) {
 
     const rawMessage = error instanceof Error ? error.message : String(error);
