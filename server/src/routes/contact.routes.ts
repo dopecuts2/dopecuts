@@ -7,6 +7,7 @@ import {
     updateContact,
     deleteContact,
     lookupContactByPhone,
+    bulkImportContacts,
 } from '../controllers/contact.controller';
 import { isAdmin } from '../middleware/isAdmin';
 
@@ -28,6 +29,13 @@ router.get('/lookup/phone/:phone', lookupContactByPhone);
  * @access  Private (Admin only)
  */
 router.post('/', isAdmin, createContact);
+
+/**
+ * @route   POST api/v1/contacts/bulk-import
+ * @desc    Bulk-import contacts from a customer list
+ * @access  Private (Admin only)
+ */
+router.post('/bulk-import', isAdmin, bulkImportContacts);
 
 /**
  * @route   GET api/v1/contacts
