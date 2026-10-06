@@ -59,6 +59,8 @@ export default function Settings() {
   const [calendarSlotDuration, setCalendarSlotDuration] = useState<number>(DEFAULT_SLOT_DURATION);
   const [calendarSaving, setCalendarSaving] = useState(false);
   const [calendarSavedAt, setCalendarSavedAt] = useState<number | null>(null);
+  const [durationPreset, setDurationPreset] = useState<'standard' | 'legacy'>('standard');
+  const [durationPresetSaving, setDurationPresetSaving] = useState(false);
   const slotDurationSyncTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [saving, setSaving] = useState<Record<SavingKey, boolean>>({
@@ -93,6 +95,9 @@ export default function Settings() {
       setProductNoticeMessage(s.productNoticeMessage || '');
       if (s.calendarWeeks) {
         setCalendarWeeks(Math.min(12, Math.max(1, s.calendarWeeks)));
+      }
+      if (s.durationPreset === 'standard' || s.durationPreset === 'legacy') {
+        setDurationPreset(s.durationPreset);
       }
     } catch (err: any) {
       setFetchError(err?.message || 'Failed to load notification settings.');
@@ -178,6 +183,30 @@ export default function Settings() {
       }
     },
     [timezone]
+  );
+
+  const handleDurationPresetChange = useCallback(
+    async (next: 'standard' | 'legacy') => {
+      if (next === durationPreset) return;
+      const prev = durationPreset;
+      setDurationPreset(next);
+      setDurationPresetSaving(true);
+      try {
+        await updateNotificationSettings({ durationPreset: next });
+        toast.success(
+          next === 'standard'
+            ? 'Service durations set to 15 / 30 / 45 / 60 minutes.'
+            : 'Service durations set to 20 / 40 minutes.',
+          { id: 'duration-preset-updated' }
+        );
+      } catch (err: any) {
+        setDurationPreset(prev);
+        toast.error(err?.message || 'Failed to save duration preset.');
+      } finally {
+        setDurationPresetSaving(false);
+      }
+    },
+    [durationPreset]
   );
 
   const persistCalendarSettings = useCallback(
@@ -573,6 +602,41 @@ export default function Settings() {
           </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4 sm:grid-cols-3">
+          <div className="space-y-2 sm:col-span-3">
+            <Label className="text-xs text-gray-400 uppercase tracking-wide">
+              Service duration options
+            </Label>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <button
+                type="button"
+                disabled={durationPresetSaving}
+                onClick={() => handleDurationPresetChange('standard')}
+                className={`flex-1 rounded-lg px-3 py-2 text-sm border transition-colors ${
+                  durationPreset === 'standard'
+                    ? 'bg-white text-black border-white'
+                    : 'bg-gray-900 text-gray-300 border-gray-700 hover:bg-gray-800'
+                }`}
+              >
+                Standard — 15 / 30 / 45 / 60 min
+              </button>
+              <button
+                type="button"
+                disabled={durationPresetSaving}
+                onClick={() => handleDurationPresetChange('legacy')}
+                className={`flex-1 rounded-lg px-3 py-2 text-sm border transition-colors ${
+                  durationPreset === 'legacy'
+                    ? 'bg-white text-black border-white'
+                    : 'bg-gray-900 text-gray-300 border-gray-700 hover:bg-gray-800'
+                }`}
+              >
+                Legacy — 20 / 40 min (dopecuts.ca)
+              </button>
+            </div>
+            <p className="text-xs text-gray-400">
+              Controls which duration options show up when adding or editing a service.
+              Switching this does not change any service you&apos;ve already set up.
+            </p>
+          </div>
           <div className="space-y-2">
             <Label className="text-xs text-gray-400 uppercase tracking-wide">Week start</Label>
             <input

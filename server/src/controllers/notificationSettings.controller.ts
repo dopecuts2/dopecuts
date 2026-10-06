@@ -37,6 +37,7 @@ export const updateSettings = async (req: Request, res: Response) => {
       productNoticeEnabled: boolean;
       productNoticeMessage: string;
       calendarWeeks: number;
+      durationPreset: 'standard' | 'legacy';
     }> = req.body ?? {};
 
     if (payload.timezone && !moment.tz.zone(payload.timezone)) {
@@ -46,6 +47,9 @@ export const updateSettings = async (req: Request, res: Response) => {
       if (typeof payload.calendarWeeks !== 'number' || payload.calendarWeeks < 1 || payload.calendarWeeks > 12) {
         return res.status(400).json({ message: 'calendarWeeks must be between 1 and 12.' });
       }
+    }
+    if (payload.durationPreset !== undefined && !['standard', 'legacy'].includes(payload.durationPreset)) {
+      return res.status(400).json({ message: 'durationPreset must be either "standard" or "legacy".' });
     }
 
     const updated = await NotificationSettings.findOneAndUpdate(

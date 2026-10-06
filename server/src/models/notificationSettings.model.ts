@@ -13,6 +13,10 @@ export interface INotificationSettings extends Document {
   productNoticeEnabled: boolean;
   productNoticeMessage: string;
   calendarWeeks: number;
+  // Which set of selectable service durations the admin Services page
+  // offers: 'standard' = 15/30/45/60 min, 'legacy' = 20/40 min (matches
+  // the scheme the old dopecuts.ca site used).
+  durationPreset: 'standard' | 'legacy';
 }
 
 const notificationSettingsSchema = new Schema<INotificationSettings>({
@@ -26,6 +30,12 @@ const notificationSettingsSchema = new Schema<INotificationSettings>({
   productNoticeEnabled: { type: Boolean, required: true, default: false },
   productNoticeMessage: { type: String, default: '' },
   calendarWeeks: { type: Number, required: true, default: 3, min: 1, max: 12 },
+  durationPreset: {
+    type: String,
+    required: true,
+    enum: ['standard', 'legacy'],
+    default: 'standard',
+  },
 }, { timestamps: true });
 
 // Removed duplicate index - 'unique: true' on the field already creates an index
