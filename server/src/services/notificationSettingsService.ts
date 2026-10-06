@@ -25,6 +25,7 @@ export async function getNotificationSettings(): Promise<INotificationSettings> 
       productNoticeEnabled: false,
       productNoticeMessage: '',
       calendarWeeks: 3,
+      durationPreset: 'standard',
     });
   } else {
     let mutated = false;
@@ -50,6 +51,10 @@ export async function getNotificationSettings(): Promise<INotificationSettings> 
     }
     if (doc.calendarWeeks === undefined) {
       doc.calendarWeeks = 3;
+      mutated = true;
+    }
+    if (doc.durationPreset === undefined) {
+      doc.durationPreset = 'standard';
       mutated = true;
     }
     if (mutated) await doc.save();

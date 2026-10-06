@@ -23,16 +23,27 @@ import {
   deleteService,
   IService,
 } from '@/lib/api/service';
+import { getNotificationSettings } from '@/lib/api/notifications';
 
-// The only durations a service can be booked for. Keeping this fixed
-// (rather than free-text) prevents odd values that don't line up with
-// the booking engine's slot cadence.
-const DURATION_OPTIONS = [15, 30, 45, 60];
+// The durations a service can be booked for, depending on which preset
+// is active in Settings > Calendar Settings > Service duration options.
+// Keeping this fixed per-preset (rather than free-text) prevents odd
+// values that don't line up with the booking engine's slot cadence.
+const PRESET_DURATION_OPTIONS: Record<'standard' | 'legacy', number[]> = {
+  standard: [15, 30, 45, 60],
+  legacy: [20, 40],
+};
+const PRESET_DEFAULT_DURATION: Record<'standard' | 'legacy', string> = {
+  standard: '30',
+  legacy: '20',
+};
 
 export default function ServicesManagement() {
   const [services, setServices] = useState<IService[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [durationPreset, setDurationPreset] = useState<'standard' | 'legacy'>('standard');
+  const durationOptions = PRESET_DURATION_OPTIONS[durationPreset];
 
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -41,7 +52,7 @@ export default function ServicesManagement() {
     name: '',
     description: '',
     price: '',
-    duration: '30', // stored as string like price, parsed on submit
+    duration: PRESET_DEFAULT_DURATION.standard, // stored as string like price, parsed on submit
   });
 
   const fetchServices = async () => {
@@ -59,6 +70,16 @@ export default function ServicesManagement() {
 
   useEffect(() => {
     fetchServices();
+    getNotificationSettings()
+      .then((s) => {
+        if (s.durationPreset === 'standard' || s.durationPreset === 'legacy') {
+          setDurationPreset(s.durationPreset);
+          setNewService((prev) => ({ ...prev, duration: PRESET_DEFAULT_DURATION[s.durationPreset] }));
+        }
+      })
+      .catch(() => {
+        // Keep the standard preset as a safe default if this fails to load.
+      });
   }, []);
 
   const handleAddService = async () => {
@@ -72,7 +93,7 @@ export default function ServicesManagement() {
         };
         await createService(serviceData);
         await fetchServices();
-        setNewService({ name: '', description: '', price: '', duration: '30' });
+        setNewService({ name: '', description: '', price: '', duration: PRESET_DEFAULT_DURATION[durationPreset] });
         setIsAddDialogOpen(false);
       } catch (err) {
         console.error('Failed to add service:', err);
@@ -93,7 +114,7 @@ export default function ServicesManagement() {
         await fetchServices();
         setIsEditDialogOpen(false);
         setEditingService(null);
-        setNewService({ name: '', description: '', price: '', duration: '30' });
+        setNewService({ name: '', description: '', price: '', duration: PRESET_DEFAULT_DURATION[durationPreset] });
       } catch (err) {
         console.error('Failed to edit service:', err);
       }
@@ -201,7 +222,7 @@ export default function ServicesManagement() {
                     onChange={(e) => setNewService({ ...newService, duration: e.target.value })}
                     className="w-full h-10 rounded-md bg-gray-700 border border-gray-600 text-white px-3"
                   >
-                    {DURATION_OPTIONS.map((mins) => (
+                    {durationOptions.map((mins) => (
                       <option key={mins} value={mins}>
                         {mins} minutes
                       </option>
@@ -287,7 +308,7 @@ export default function ServicesManagement() {
                   onChange={(e) => setNewService({ ...newService, duration: e.target.value })}
                   className="w-full h-10 rounded-md bg-gray-700 border border-gray-600 text-white px-3"
                 >
-                  {DURATION_OPTIONS.map((mins) => (
+                  {durationOptions.map((mins) => (
                     <option key={mins} value={mins}>
                       {mins} minutes
                     </option>
