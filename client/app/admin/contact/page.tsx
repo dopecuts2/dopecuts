@@ -151,7 +151,8 @@ function buildContactRows(rows: string[][]): BulkImportContactRow[] {
 interface Customer {
   id: string; // Changed to string to match MongoDB's _id
   fullName: string;
-  email: string;
+  // Optional: bulk-imported customers often have no email on file.
+  email?: string;
   phone: string;
   dateAdded: string; // Represents the createdAt date from the API
 }
@@ -290,7 +291,7 @@ export default function ContactManagement() {
     .filter(
       customer =>
         customer.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        customer.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (customer.email || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
         customer.phone.includes(searchQuery)
     )
     .sort((a, b) => {
@@ -312,7 +313,7 @@ export default function ContactManagement() {
 
   const handleOpenEditDialog = (customer: Customer) => {
     setIsEditing(true);
-    setCurrentCustomer(customer);
+    setCurrentCustomer({ ...customer, email: customer.email || '' });
     setFormErrors({});
     setIsFormDialogOpen(true);
   };
@@ -685,7 +686,7 @@ export default function ContactManagement() {
                           {customer.fullName}
                         </TableCell>
                         <TableCell className="text-gray-300">
-                          {customer.email}
+                          {customer.email || <span className="text-gray-500">—</span>}
                         </TableCell>
                         <TableCell className="text-gray-300">
                           {customer.phone}
@@ -773,7 +774,7 @@ export default function ContactManagement() {
                       <div className="space-y-1 text-sm">
                         <p className="text-gray-300">
                           <span className="text-gray-400">Email:</span>{' '}
-                          {customer.email}
+                          {customer.email || '—'}
                         </p>
                         <p className="text-gray-300">
                           <span className="text-gray-400">Phone:</span>{' '}

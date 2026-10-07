@@ -6,7 +6,9 @@ import apiClient from './apiClient';
 export interface IContact {
     _id: string;
     name: string;
-    email: string;
+    // Optional: bulk-imported contacts (see bulkImportContacts) often have
+    // no email on file, only a phone number.
+    email?: string;
     phone: string;
     createdAt: string;
     updatedAt: string;

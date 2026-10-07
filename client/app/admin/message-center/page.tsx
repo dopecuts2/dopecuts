@@ -77,7 +77,7 @@ export default function MessageCenterPage() {
         if (!normalizedQuery) return true;
         return (
           contact.name.toLowerCase().includes(normalizedQuery) ||
-          contact.email.toLowerCase().includes(normalizedQuery) ||
+          (contact.email || '').toLowerCase().includes(normalizedQuery) ||
           contact.phone.toLowerCase().includes(normalizedQuery)
         );
       })
@@ -319,7 +319,9 @@ export default function MessageCenterPage() {
                             />
                           </TableCell>
                           <TableCell className="text-white">{contact.name}</TableCell>
-                          <TableCell className="text-gray-300">{contact.email}</TableCell>
+                          <TableCell className="text-gray-300">
+                            {contact.email || <span className="text-gray-500">—</span>}
+                          </TableCell>
                           <TableCell className="text-gray-300">{contact.phone}</TableCell>
                         </TableRow>
                       );
