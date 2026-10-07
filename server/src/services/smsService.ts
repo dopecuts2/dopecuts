@@ -83,11 +83,20 @@ async function incrementAndCheckQuota(): Promise<{ allowed: boolean; remaining: 
 }
 
 async function peekQuota(): Promise<{ allowed: boolean; remaining: number; used: number }> {
-  const key = todayKey();
-  const doc = await SmsQuota.findOne({ dateKey: key });
-  const used = doc?.count || 0;
-  const remaining = Math.max(0, SMS_DAILY_LIMIT - used);
-  return { allowed: used < SMS_DAILY_LIMIT, remaining, used };
+  try {
+    const key = todayKey();
+    const doc = await SmsQuota.findOne({ dateKey: key });
+    const used = doc?.count || 0;
+    const remaining = Math.max(0, SMS_DAILY_LIMIT - used);
+    return { allowed: used < SMS_DAILY_LIMIT, remaining, used };
+  } catch (err) {
+    // Never let a quota-check hiccup throw out of sendSms(): SMS is a
+    // best-effort notification, not something that should ever be able
+    // to make booking creation (which has already saved by this point)
+    // look like it failed.
+    logger.error('Failed to read SMS quota counter:', err);
+    return { allowed: false, remaining: 0, used: SMS_DAILY_LIMIT };
+  }
 }
 
 function normalizeE164(raw: string): string {

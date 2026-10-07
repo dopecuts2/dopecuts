@@ -16,6 +16,33 @@ import { getBusinessTimezone } from '../utils/timezone';
 
 const SWEEP_INTERVAL_MS = 1000 * 60 * 15; // every 15 minutes
 
+// SMS is a best-effort notification sent after a queue entry has already
+// been saved/expired/assigned. Guard against sendSms/sendAdminSms ever
+// throwing so it can't turn an already-successful DB change into a
+// reported failure (or an unhandled rejection in the background sweep).
+async function safeSendSms(
+  phone: string,
+  message: string
+): Promise<{ sent: boolean; reason?: string; messageId?: string }> {
+  try {
+    return await sendSms(phone, message);
+  } catch (err) {
+    logger.error('Unexpected error sending customer SMS (treated as not sent):', err);
+    return { sent: false, reason: 'sms_exception' };
+  }
+}
+
+async function safeSendAdminSms(
+  message: string
+): Promise<{ sent: boolean; reason?: string; messageId?: string }> {
+  try {
+    return await sendAdminSms(message);
+  } catch (err) {
+    logger.error('Unexpected error sending admin SMS (treated as not sent):', err);
+    return { sent: false, reason: 'sms_exception' };
+  }
+}
+
 // The admin now chooses an explicit duration (15/30/45/60 min) per
 // service, so that value is authoritative -- no more inferring duration
 // from the service name.
@@ -45,7 +72,7 @@ async function expireEntry(entry: IQueueEntry) {
   await entry.save();
 
   const message = `Hi ${entry.firstName}, we weren’t able to find an opening on ${entry.requestedDate}. Please try booking another day.`;
-  const smsRes = await sendSms(entry.phone, message);
+  const smsRes = await safeSendSms(entry.phone, message);
   if (!smsRes.sent) {
     logger.warn('Queue: failed to notify user about no availability', { reason: smsRes.reason, phone: entry.phone });
   }
@@ -203,7 +230,7 @@ export async function assignQueueEntryForSlot(cancelledBooking: IBooking) {
 
   const smsType = savedBooking.status === 'pending' ? 'pending' : 'confirmed';
   const smsText = buildCustomerSms(smsType, savedBooking);
-  const smsResult = await sendSms(savedBooking.phone, smsText);
+  const smsResult = await safeSendSms(savedBooking.phone, smsText);
   if (!smsResult.sent) {
     logger.warn('Queue: failed to SMS customer after assignment', { reason: smsResult.reason, phone: savedBooking.phone });
   }
@@ -272,7 +299,7 @@ export async function convertQueueEntry(entryId: string, time: string, overrideS
 
   const smsType = savedBooking.status === 'pending' ? 'pending' : 'confirmed';
   const smsText = buildCustomerSms(smsType, savedBooking);
-  const smsResult = await sendSms(savedBooking.phone, smsText);
+  const smsResult = await safeSendSms(savedBooking.phone, smsText);
   if (!smsResult.sent) {
     logger.warn('Queue: failed to SMS customer after manual conversion', { reason: smsResult.reason, phone: savedBooking.phone });
   }

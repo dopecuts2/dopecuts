@@ -99,6 +99,34 @@ function logSmsOutcome(
   }
 }
 
+// SMS is a best-effort notification sent *after* a booking has already
+// been created/updated/cancelled in the database. If sendSms/sendAdminSms
+// ever throws, these wrappers keep that from bubbling up into the outer
+// catch block and reporting the whole request as failed when the actual
+// booking change already succeeded.
+async function safeSendSms(
+  phone: string,
+  message: string
+): Promise<{ sent: boolean; reason?: string; messageId?: string }> {
+  try {
+    return await sendSms(phone, message);
+  } catch (err) {
+    logger.error('Unexpected error sending customer SMS (treated as not sent):', err);
+    return { sent: false, reason: 'sms_exception' };
+  }
+}
+
+async function safeSendAdminSms(
+  message: string
+): Promise<{ sent: boolean; reason?: string; messageId?: string }> {
+  try {
+    return await sendAdminSms(message);
+  } catch (err) {
+    logger.error('Unexpected error sending admin SMS (treated as not sent):', err);
+    return { sent: false, reason: 'sms_exception' };
+  }
+}
+
 async function ensureContactForBooking(booking: IBooking, session: mongoose.ClientSession) {
   const contactName = [booking.firstName, booking.lastName].filter(Boolean).join(' ') || booking.firstName;
   await Contact.findOneAndUpdate(
@@ -705,7 +733,7 @@ export const createBooking = async (req: Request, res: Response) => {
           booking.status === 'pending' ? 'pending' : 'confirmed',
           booking
         );
-        const smsResult = await sendSms(booking.phone, smsText);
+        const smsResult = await safeSendSms(booking.phone, smsText);
         logSmsOutcome('createBooking', 'customer', booking.phone, smsResult);
       })
     );
@@ -722,7 +750,7 @@ export const createBooking = async (req: Request, res: Response) => {
     const adminMsg = confirmedPrimaryBooking.status === 'pending'
       ? `New PENDING booking: ${adminLine}${guestSuffix}`
       : `New CONFIRMED booking: ${adminLine}${guestSuffix}`;
-    const adminSmsRes = await sendAdminSms(adminMsg);
+    const adminSmsRes = await safeSendAdminSms(adminMsg);
     logSmsOutcome('createBooking', 'admin', null, adminSmsRes);
 
     res.status(201).json({
@@ -1077,7 +1105,7 @@ export const updateBooking = async (req: Request, res: Response) => {
 
     // SMS
     const cSmsText = buildCustomerSms('updated', booking);
-    const cSms = await sendSms(booking.phone, cSmsText);
+    const cSms = await safeSendSms(booking.phone, cSmsText);
     logSmsOutcome('updateBooking', 'customer', booking.phone, cSms);
 
     const adminLine = formatAdminBookingLine(booking, timezone);
@@ -1085,7 +1113,7 @@ export const updateBooking = async (req: Request, res: Response) => {
       booking.additionalGuests && booking.additionalGuests.length > 0
         ? ` [+${booking.additionalGuests.length} guest${booking.additionalGuests.length > 1 ? 's' : ''}]`
         : '';
-    const aSms = await sendAdminSms(`Booking UPDATED: ${adminLine}${guestSuffix}`);
+    const aSms = await safeSendAdminSms(`Booking UPDATED: ${adminLine}${guestSuffix}`);
     logSmsOutcome('updateBooking', 'admin', null, aSms);
 
     res.status(200).json({ message: 'Booking updated successfully!', booking });
@@ -1162,7 +1190,7 @@ export const cancelBooking = async (req: Request, res: Response) => {
 
     // SMS
     const cSmsText = buildCustomerSms('cancelled', booking);
-    const cSms = await sendSms(booking.phone, cSmsText);
+    const cSms = await safeSendSms(booking.phone, cSmsText);
     logSmsOutcome('cancelBooking', 'customer', booking.phone, cSms);
 
     const adminLine = formatAdminBookingLine(booking, timezone);
@@ -1170,7 +1198,7 @@ export const cancelBooking = async (req: Request, res: Response) => {
       booking.additionalGuests && booking.additionalGuests.length > 0
         ? ` [+${booking.additionalGuests.length} guest${booking.additionalGuests.length > 1 ? 's' : ''}]`
         : '';
-    const aSms = await sendAdminSms(`Booking CANCELLED: ${adminLine}${guestSuffix}`);
+    const aSms = await safeSendAdminSms(`Booking CANCELLED: ${adminLine}${guestSuffix}`);
     logSmsOutcome('cancelBooking', 'admin', null, aSms);
 
     res.status(200).json({ message: 'Booking cancelled successfully.' });
@@ -1244,7 +1272,7 @@ export const confirmPayment = async (req: Request, res: Response) => {
 
     // SMS
     const cSmsText = buildCustomerSms('payment-confirmed', updatedBooking);
-    const cSms = await sendSms(updatedBooking.phone, cSmsText);
+    const cSms = await safeSendSms(updatedBooking.phone, cSmsText);
     logSmsOutcome('confirmPayment', 'customer', updatedBooking.phone, cSms);
 
     res.status(200).json({ message: 'Payment confirmed and booking is now confirmed.', booking: updatedBooking });
