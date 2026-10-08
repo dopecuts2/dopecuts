@@ -1025,7 +1025,7 @@ export default function BookAppointment() {
           {/* Step Content */}
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 lg:gap-8">
             {/* Main Content */}
-            <div className="xl:col-span-2 order-2 xl:order-1">
+            <div className="xl:col-span-2 order-1">
               <Card className="bg-gray-800 border-gray-700">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-3 text-white text-xl lg:text-2xl">
@@ -1667,7 +1667,7 @@ export default function BookAppointment() {
             </div>
 
             {/* Sidebar */}
-            <div className="xl:col-span-1 order-1 xl:order-2">
+            <div className="xl:col-span-1 order-2">
               <div className="xl:sticky xl:top-8">
                 <Card className="bg-gray-800 border-gray-700">
                   <CardHeader>
