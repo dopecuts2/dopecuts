@@ -7,7 +7,7 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import PhoneInput from 'react-phone-number-input';
 import 'react-phone-number-input/style.css';
 import { isValidPhoneNumber, E164Number } from 'libphonenumber-js';
-import { Scissors, Calendar, X, Clock, User, CreditCard, ChevronLeft, ChevronRight, Loader2, Copy, MapPin } from 'lucide-react';
+import { Scissors, Calendar, X, Clock, User, Users, CreditCard, ChevronLeft, ChevronRight, Loader2, Copy, MapPin } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -456,7 +456,7 @@ export default function BookAppointment() {
 
   // --- Event Handlers ---
   const handleNext = () => {
-    if (step < 4) setStep(step + 1);
+    if (step < 5) setStep(step + 1);
   };
 
   const handleBack = () => {
@@ -999,7 +999,7 @@ export default function BookAppointment() {
           {/* Progress Indicator */}
           <div className="flex justify-center mb-8 lg:mb-12">
             <div className="flex items-center space-x-4">
-              {[1, 2, 3, 4].map((stepNumber) => (
+              {[1, 2, 3, 4, 5].map((stepNumber) => (
                 <div key={stepNumber} className="flex items-center">
                   <div
                     className={`w-8 h-8 lg:w-12 lg:h-12 rounded-full flex items-center justify-center text-xs lg:text-sm font-bold transition-all duration-300 ${
@@ -1010,7 +1010,7 @@ export default function BookAppointment() {
                   >
                     {stepNumber}
                   </div>
-                  {stepNumber < 4 && (
+                  {stepNumber < 5 && (
                     <div
                       className={`w-8 lg:w-16 h-1 transition-all duration-300 ${
                         step > stepNumber ? 'bg-white' : 'bg-gray-700'
@@ -1032,13 +1032,15 @@ export default function BookAppointment() {
                     {step === 1 && <><Scissors className="h-6 w-6" /> Select Service</>}
                     {step === 2 && <><Calendar className="h-6 w-6" /> Choose Date & Time</>}
                     {step === 3 && <><User className="h-6 w-6" /> Your Information</>}
-                    {step === 4 && <><CreditCard className="h-6 w-6" /> Confirmation</>}
+                    {step === 4 && <><Users className="h-6 w-6" /> Add Persons</>}
+                    {step === 5 && <><CreditCard className="h-6 w-6" /> Confirmation</>}
                   </CardTitle>
                   <CardDescription className="text-gray-300 text-base lg:text-lg">
                     {step === 1 && 'Choose the service you would like to book'}
                     {step === 2 && 'Select your preferred date and time'}
                     {step === 3 && 'Please provide your contact information'}
-                    {step === 4 && 'Review and confirm your booking'}
+                    {step === 4 && 'Add anyone else booking with you, or skip ahead'}
+                    {step === 5 && 'Review and confirm your booking'}
                   </CardDescription>
                 </CardHeader>
 
@@ -1372,161 +1374,6 @@ export default function BookAppointment() {
                             </div>
                           )}
 
-                          {!queueRequestedDate && (
-                          <div className="bg-gray-700 border border-gray-600 rounded-lg p-4 space-y-4">
-                            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                              <div>
-                                <p className="text-white font-medium">Multiple bookings</p>
-                                <p className="text-sm text-gray-400">
-                                  Select how many additional guests to add; their forms will appear below.
-                                </p>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <Label className="text-xs uppercase tracking-wide text-gray-300">
-                                  Add bookings
-                                </Label>
-                                <select
-                                  value={guestEntries.length}
-                                  onChange={(e) =>
-                                    updateGuestCount(Math.min(maxAdditionalGuests, Number(e.target.value) || 0))
-                                  }
-                                  disabled={!formData.date || maxAdditionalGuests === 0}
-                                  className="bg-gray-900 border border-gray-600 rounded-lg text-white px-3 py-2 text-sm disabled:opacity-60"
-                                >
-                                  <option value={0}>None</option>
-                                  {Array.from({ length: maxAdditionalGuests }, (_, idx) => idx + 1).map((count) => (
-                                    <option key={`guest-count-${count}`} value={count}>
-                                      {count} {count === 1 ? 'booking' : 'bookings'}
-                                    </option>
-                                  ))}
-                                </select>
-                              </div>
-                            </div>
-                            {!formData.date && (
-                              <p className="text-xs text-amber-300">
-                                Select a date and time to enable additional bookings.
-                              </p>
-                            )}
-                            {formData.date && maxAdditionalGuests === 0 && (
-                              <p className="text-xs text-amber-300">
-                                Only one slot remains on this day, so no more bookings can be added.
-                              </p>
-                            )}
-                            <div className="space-y-4">
-                              {guestEntries.map((guest, index) => (
-                                <div
-                                  key={`guest-${index}`}
-                                  className="bg-gray-900 border border-gray-800 rounded-xl p-4 space-y-3"
-                                >
-                                  <div className="flex items-center justify-between">
-                                    <p className="text-white font-medium">Additional booking {index + 1}</p>
-                                    <Button
-                                      size="sm"
-                                      variant="ghost"
-                                      onClick={() => removeGuestEntry(index)}
-                                      className="text-gray-400"
-                                    >
-                                      <X className="h-4 w-4" />
-                                    </Button>
-                                  </div>
-                                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                                    <div>
-                                      <Label className="text-white font-medium text-xs">First Name</Label>
-                                      <Input
-                                        value={guest.firstName}
-                                        onChange={(e) =>
-                                          updateGuestEntry(index, { firstName: e.target.value })
-                                        }
-                                        placeholder="First name"
-                                        className="mt-2 bg-gray-900 border-gray-600 text-white"
-                                      />
-                                    </div>
-                                    <div>
-                                      <Label className="text-white font-medium text-xs">Last Name</Label>
-                                      <Input
-                                        value={guest.lastName}
-                                        onChange={(e) =>
-                                          updateGuestEntry(index, { lastName: e.target.value })
-                                        }
-                                        placeholder="Last name"
-                                        className="mt-2 bg-gray-900 border-gray-600 text-white"
-                                      />
-                                    </div>
-                                  </div>
-                                  <div>
-                                    <Label className="text-white font-medium text-xs">Email (optional)</Label>
-                                    <Input
-                                      type="email"
-                                      value={guest.email}
-                                      onChange={(e) =>
-                                        updateGuestEntry(index, { email: e.target.value })
-                                      }
-                                      placeholder="Email address"
-                                      className="mt-2 bg-gray-900 border-gray-600 text-white"
-                                    />
-                                  </div>
-                                  <div>
-                                    <Label className="text-white font-medium text-xs">Phone (optional)</Label>
-                                    <Input
-                                      type="tel"
-                                      value={guest.phone || ''}
-                                      onChange={(e) =>
-                                        updateGuestEntry(index, { phone: e.target.value })
-                                      }
-                                      placeholder="Phone number"
-                                      className="mt-2 bg-gray-900 border-gray-600 text-white"
-                                    />
-                                  </div>
-                                  <div>
-                                    <Label className="text-white font-medium text-xs">Service</Label>
-                                    <select
-                                      className="w-full bg-gray-900 border border-gray-600 rounded-lg text-white px-3 py-2 mt-2"
-                                      value={guest.serviceId}
-                                      onChange={(e) =>
-                                        updateGuestEntry(index, { serviceId: e.target.value })
-                                      }
-                                    >
-                                      <option value="">Select service</option>
-                                      {services.map((svc) => (
-                                        <option
-                                          key={`guest-${index}-svc-${svc._id}`}
-                                          value={svc._id}
-                                        >
-                                          {svc.name} • {getAdaptiveDuration(svc)} mins
-                                        </option>
-                                      ))}
-                                    </select>
-                                  </div>
-                                  <div>
-                                    <Label className="text-white font-medium text-xs">Time</Label>
-                                    {guestSlotsLoading[index] ? (
-                                      <div className="mt-2 flex justify-center items-center h-20">
-                                        <Loader2 className="h-6 w-6 text-white animate-spin" />
-                                      </div>
-                                    ) : (
-                                      <div className="mt-2 grid grid-cols-3 sm:grid-cols-4 gap-2">
-                                        {timeOptionsForGuest(index, guest.time).map((slot) => (
-                                          <button
-                                            key={`guest-${index}-time-${slot}`}
-                                            onClick={() => updateGuestEntry(index, { time: slot })}
-                                            className={`text-sm rounded-lg border-2 py-2 transition-all duration-200 ${
-                                              guest.time === slot
-                                                ? 'border-white bg-white text-black'
-                                                : 'border-gray-600 bg-gray-800 text-white hover:border-gray-400'
-                                            }`}
-                                          >
-                                            {slot}
-                                          </button>
-                                        ))}
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                          )}
-
                           <div>
                             <Label htmlFor="notes" className="text-white font-medium">Special Requests (Optional)</Label>
                             <Textarea
@@ -1618,8 +1465,166 @@ export default function BookAppointment() {
                     </div>
                   )}
 
-                  {/* Step 4: Confirmation */}
+                  {/* Step 4: Add Persons */}
                   {step === 4 && (
+                    <div className="space-y-6">
+                      <div className="bg-gray-700 border border-gray-600 rounded-lg p-4 space-y-4">
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                          <div>
+                            <p className="text-white font-medium">Add Persons</p>
+                            <p className="text-sm text-gray-400">
+                              Booking for more than yourself? Choose how many people to add and their details will appear below. Not adding anyone? Just hit Continue.
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Label className="text-xs uppercase tracking-wide text-gray-300">
+                              Add persons
+                            </Label>
+                            <select
+                              value={guestEntries.length}
+                              onChange={(e) =>
+                                updateGuestCount(Math.min(maxAdditionalGuests, Number(e.target.value) || 0))
+                              }
+                              disabled={!formData.date || maxAdditionalGuests === 0}
+                              className="bg-gray-900 border border-gray-600 rounded-lg text-white px-3 py-2 text-sm disabled:opacity-60"
+                            >
+                              <option value={0}>None</option>
+                              {Array.from({ length: maxAdditionalGuests }, (_, idx) => idx + 1).map((count) => (
+                                <option key={`guest-count-${count}`} value={count}>
+                                  {count} {count === 1 ? 'person' : 'persons'}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+                        {!formData.date && (
+                          <p className="text-xs text-amber-300">
+                            Select a date and time to enable additional persons.
+                          </p>
+                        )}
+                        {formData.date && maxAdditionalGuests === 0 && (
+                          <p className="text-xs text-amber-300">
+                            Only one slot remains on this day, so no more persons can be added.
+                          </p>
+                        )}
+                        <div className="space-y-4">
+                          {guestEntries.map((guest, index) => (
+                            <div
+                              key={`guest-${index}`}
+                              className="bg-gray-900 border border-gray-800 rounded-xl p-4 space-y-3"
+                            >
+                              <div className="flex items-center justify-between">
+                                <p className="text-white font-medium">Person {index + 1}</p>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => removeGuestEntry(index)}
+                                  className="text-gray-400"
+                                >
+                                  <X className="h-4 w-4" />
+                                </Button>
+                              </div>
+                              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                                <div>
+                                  <Label className="text-white font-medium text-xs">First Name</Label>
+                                  <Input
+                                    value={guest.firstName}
+                                    onChange={(e) =>
+                                      updateGuestEntry(index, { firstName: e.target.value })
+                                    }
+                                    placeholder="First name"
+                                    className="mt-2 bg-gray-900 border-gray-600 text-white"
+                                  />
+                                </div>
+                                <div>
+                                  <Label className="text-white font-medium text-xs">Last Name</Label>
+                                  <Input
+                                    value={guest.lastName}
+                                    onChange={(e) =>
+                                      updateGuestEntry(index, { lastName: e.target.value })
+                                    }
+                                    placeholder="Last name"
+                                    className="mt-2 bg-gray-900 border-gray-600 text-white"
+                                  />
+                                </div>
+                              </div>
+                              <div>
+                                <Label className="text-white font-medium text-xs">Email (optional)</Label>
+                                <Input
+                                  type="email"
+                                  value={guest.email}
+                                  onChange={(e) =>
+                                    updateGuestEntry(index, { email: e.target.value })
+                                  }
+                                  placeholder="Email address"
+                                  className="mt-2 bg-gray-900 border-gray-600 text-white"
+                                />
+                              </div>
+                              <div>
+                                <Label className="text-white font-medium text-xs">Phone (optional)</Label>
+                                <Input
+                                  type="tel"
+                                  value={guest.phone || ''}
+                                  onChange={(e) =>
+                                    updateGuestEntry(index, { phone: e.target.value })
+                                  }
+                                  placeholder="Phone number"
+                                  className="mt-2 bg-gray-900 border-gray-600 text-white"
+                                />
+                              </div>
+                              <div>
+                                <Label className="text-white font-medium text-xs">Service</Label>
+                                <select
+                                  className="w-full bg-gray-900 border border-gray-600 rounded-lg text-white px-3 py-2 mt-2"
+                                  value={guest.serviceId}
+                                  onChange={(e) =>
+                                    updateGuestEntry(index, { serviceId: e.target.value })
+                                  }
+                                >
+                                  <option value="">Select service</option>
+                                  {services.map((svc) => (
+                                    <option
+                                      key={`guest-${index}-svc-${svc._id}`}
+                                      value={svc._id}
+                                    >
+                                      {svc.name} • {getAdaptiveDuration(svc)} mins
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+                              <div>
+                                <Label className="text-white font-medium text-xs">Time</Label>
+                                {guestSlotsLoading[index] ? (
+                                  <div className="mt-2 flex justify-center items-center h-20">
+                                    <Loader2 className="h-6 w-6 text-white animate-spin" />
+                                  </div>
+                                ) : (
+                                  <div className="mt-2 grid grid-cols-3 sm:grid-cols-4 gap-2">
+                                    {timeOptionsForGuest(index, guest.time).map((slot) => (
+                                      <button
+                                        key={`guest-${index}-time-${slot}`}
+                                        onClick={() => updateGuestEntry(index, { time: slot })}
+                                        className={`text-sm rounded-lg border-2 py-2 transition-all duration-200 ${
+                                          guest.time === slot
+                                            ? 'border-white bg-white text-black'
+                                            : 'border-gray-600 bg-gray-800 text-white hover:border-gray-400'
+                                        }`}
+                                      >
+                                        {slot}
+                                      </button>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Step 5: Confirmation */}
+                  {step === 5 && (
                     <div className="space-y-6">
                       <div className="bg-gray-700 p-6 rounded-lg border border-gray-600">
                         <h3 className="text-lg lg:text-xl font-bold text-white mb-6">Booking Summary</h3>
@@ -1683,7 +1688,7 @@ export default function BookAppointment() {
                         </p>
                         {guestEntries.length > 0 && (
                           <p className="text-xs text-gray-300 mt-1">
-                            Includes {guestEntries.length} additional booking{guestEntries.length > 1 ? 's' : ''}
+                            Includes {guestEntries.length} additional person{guestEntries.length > 1 ? 's' : ''}
                           </p>
                         )}
                       </div>
@@ -1731,7 +1736,7 @@ export default function BookAppointment() {
               Back
             </Button>
 
-            {step < 4 ? (
+            {step < 5 ? (
               queueRequestedDate && step === 3 ? (
                 <Button
                   onClick={handleJoinQueue}
