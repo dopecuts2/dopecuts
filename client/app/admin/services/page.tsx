@@ -15,9 +15,9 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
-import { Scissors, Plus, Trash2, Edit, Clock, DollarSign } from 'lucide-react';
+import { Scissors, Plus, Trash2, Edit, Clock, DollarSign, Eye, EyeOff } from 'lucide-react';
 import {
-  getAllServices,
+  getAllServicesForAdmin,
   createService,
   updateService,
   deleteService,
@@ -58,7 +58,7 @@ export default function ServicesManagement() {
   const fetchServices = async () => {
     try {
       setIsLoading(true);
-      const data = await getAllServices();
+      const data = await getAllServicesForAdmin();
       setServices(data);
     } catch (err) {
       setError('Failed to fetch services. Please try again later.');
@@ -138,6 +138,23 @@ export default function ServicesManagement() {
       setServices(services.filter((service) => service._id !== id));
     } catch (err) {
       console.error('Failed to delete service:', err);
+    }
+  };
+
+  const handleToggleVisibility = async (service: IService) => {
+    const nextVisible = !service.isVisible;
+    // Update optimistically so the button responds instantly.
+    setServices((prev) =>
+      prev.map((s) => (s._id === service._id ? { ...s, isVisible: nextVisible } : s))
+    );
+    try {
+      await updateService(service._id, { isVisible: nextVisible });
+    } catch (err) {
+      console.error('Failed to update service visibility:', err);
+      // Roll back on failure.
+      setServices((prev) =>
+        prev.map((s) => (s._id === service._id ? { ...s, isVisible: service.isVisible } : s))
+      );
     }
   };
 
@@ -337,13 +354,21 @@ export default function ServicesManagement() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
         {services.map((service) => (
-          <Card key={service._id} className="bg-gray-800 border-gray-700">
+          <Card
+            key={service._id}
+            className={`bg-gray-800 border-gray-700 ${!service.isVisible ? 'opacity-60' : ''}`}
+          >
             <CardHeader>
               <div className="flex items-start justify-between">
                 <div className="flex items-center gap-2">
                   <Scissors className="h-5 w-5 text-gray-400" />
                   <CardTitle className="text-white text-lg">{service.name}</CardTitle>
                 </div>
+                {!service.isVisible && (
+                  <span className="text-xs font-medium text-gray-900 bg-yellow-500 rounded-full px-2 py-0.5">
+                    Hidden
+                  </span>
+                )}
               </div>
               <CardDescription className="text-gray-400 min-h-[40px]">
                 {service.description || 'No description provided.'}
@@ -370,6 +395,24 @@ export default function ServicesManagement() {
                   >
                     <Edit className="h-4 w-4 mr-1" />
                     Edit
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleToggleVisibility(service)}
+                    className="flex-1 border-gray-600 text-black hover:bg-gray-700 hover:text-white"
+                  >
+                    {service.isVisible ? (
+                      <>
+                        <EyeOff className="h-4 w-4 mr-1" />
+                        Hide
+                      </>
+                    ) : (
+                      <>
+                        <Eye className="h-4 w-4 mr-1" />
+                        Show
+                      </>
+                    )}
                   </Button>
                   <Button
                     variant="outline"
