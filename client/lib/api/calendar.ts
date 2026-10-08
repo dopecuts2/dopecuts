@@ -18,6 +18,7 @@ export interface ICalendarSettings {
 export interface IBlockedTime {
   startTime: string;
   endTime: string;
+  isEnabled: boolean;
 }
 
 export interface IWeeklyDay {
@@ -26,6 +27,7 @@ export interface IWeeklyDay {
   endTime: string;
   slotDuration: number;
   isEnabled: boolean;
+  useDefaultHours: boolean;
   blockedTimes: IBlockedTime[];
 }
 
