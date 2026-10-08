@@ -4,6 +4,7 @@ import moment from 'moment-timezone';
 import { Booking, IBooking } from '../models/booking.model';
 import { Service } from '../models/service.model';
 import { Contact } from '../models/contact.model';
+import { QueueEntry } from '../models/queue.model';
 import {
   sendBookingConfirmationEmail,
   sendAdminNotificationEmail,
@@ -1226,5 +1227,39 @@ export const confirmPayment = async (req: Request, res: Response) => {
   } catch (error) {
     logger.error(`Error confirming payment for booking ${id}:`, error);
     res.status(500).json({ message: 'Failed to confirm payment.' });
+  }
+};
+
+/**
+ * Admin: permanently deletes every booking and every queue entry, for a
+ * clean launch. Deliberately leaves everything else untouched -- services,
+ * availability/blocked-time settings, saved contacts, restrictions. Guarded
+ * by a required confirmation phrase in the body as well as isAdmin, since
+ * it's irreversible.
+ */
+export const clearAllBookingsAndQueue = async (req: Request, res: Response) => {
+  const { confirm } = req.body as { confirm?: string };
+  if (confirm !== 'DELETE ALL BOOKINGS') {
+    return res.status(400).json({ message: 'Confirmation phrase did not match. Nothing was deleted.' });
+  }
+
+  try {
+    const [bookingResult, queueResult] = await Promise.all([
+      Booking.deleteMany({}),
+      QueueEntry.deleteMany({}),
+    ]);
+
+    logger.warn(
+      `Admin cleared all bookings/queue: ${bookingResult.deletedCount} bookings, ${queueResult.deletedCount} queue entries deleted.`
+    );
+
+    res.status(200).json({
+      message: `Deleted ${bookingResult.deletedCount} bookings and ${queueResult.deletedCount} queue entries.`,
+      deletedBookings: bookingResult.deletedCount,
+      deletedQueueEntries: queueResult.deletedCount,
+    });
+  } catch (error) {
+    logger.error('Error clearing all bookings/queue:', error);
+    res.status(500).json({ message: 'Failed to clear bookings and queue.' });
   }
 };

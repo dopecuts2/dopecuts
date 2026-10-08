@@ -3,10 +3,11 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
-import { Bell, Calendar as CalendarIcon, KeyRound, Copy, Check } from 'lucide-react';
+import { Bell, Calendar as CalendarIcon, KeyRound, Copy, Check, AlertTriangle } from 'lucide-react';
 import moment from 'moment';
 import { toast } from 'sonner';
 import {
@@ -21,6 +22,16 @@ import {
   revokeApiKey,
   type ApiKeyStatus,
 } from '@/lib/api/apiKeys';
+import { clearAllBookingsAndQueue } from '@/lib/api/booking';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
 
 type SavingKey =
   | 'emailEnabled'
@@ -74,6 +85,11 @@ export default function Settings() {
   const [apiKeyActionLoading, setApiKeyActionLoading] = useState(false);
   const [generatedKey, setGeneratedKey] = useState<string | null>(null);
   const [keyCopied, setKeyCopied] = useState(false);
+
+  const CLEAR_ALL_CONFIRM_PHRASE = 'DELETE ALL BOOKINGS';
+  const [clearAllDialogOpen, setClearAllDialogOpen] = useState(false);
+  const [clearAllConfirmText, setClearAllConfirmText] = useState('');
+  const [clearAllLoading, setClearAllLoading] = useState(false);
 
   const [saving, setSaving] = useState<Record<SavingKey, boolean>>({
     emailEnabled: false,
@@ -176,6 +192,22 @@ export default function Settings() {
       toast.error('Failed to revoke API key.');
     } finally {
       setApiKeyActionLoading(false);
+    }
+  };
+
+  const handleClearAllBookings = async () => {
+    if (clearAllConfirmText !== CLEAR_ALL_CONFIRM_PHRASE) return;
+    setClearAllLoading(true);
+    try {
+      const result = await clearAllBookingsAndQueue();
+      toast.success(`Deleted ${result.deletedBookings} bookings and ${result.deletedQueueEntries} queue entries.`);
+      setClearAllDialogOpen(false);
+      setClearAllConfirmText('');
+    } catch (err) {
+      console.error('Failed to clear all bookings/queue:', err);
+      toast.error('Failed to clear bookings and queue.');
+    } finally {
+      setClearAllLoading(false);
     }
   };
 
@@ -872,6 +904,75 @@ export default function Settings() {
           )}
         </CardContent>
       </Card>
+
+      <Card className="bg-gray-800 border-red-900">
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="h-5 w-5 text-red-400" />
+            <CardTitle className="text-white">Danger Zone</CardTitle>
+          </div>
+          <CardDescription className="text-gray-300">
+            For a clean launch: permanently deletes every booking (confirmed, pending, and
+            cancelled) and every queue entry. Your availability settings, services, and saved
+            customer contacts are not touched. This cannot be undone.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <button
+            type="button"
+            onClick={() => setClearAllDialogOpen(true)}
+            className="rounded-lg px-4 py-2 text-sm font-medium bg-red-900 border border-red-700 text-red-100 hover:bg-red-800"
+          >
+            Clear All Bookings &amp; Queue
+          </button>
+        </CardContent>
+      </Card>
+
+      <Dialog
+        open={clearAllDialogOpen}
+        onOpenChange={(open) => {
+          setClearAllDialogOpen(open);
+          if (!open) setClearAllConfirmText('');
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Clear all bookings &amp; queue?</DialogTitle>
+            <DialogDescription>
+              This permanently deletes every booking and every queue entry from the database.
+              Availability settings, services, and saved contacts are not affected. This cannot be
+              undone.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label className="text-white font-medium">
+              Type <span className="font-mono">{CLEAR_ALL_CONFIRM_PHRASE}</span> to confirm
+            </Label>
+            <Input
+              value={clearAllConfirmText}
+              onChange={(e) => setClearAllConfirmText(e.target.value)}
+              className="bg-gray-900 border-gray-700 text-white"
+              placeholder={CLEAR_ALL_CONFIRM_PHRASE}
+            />
+          </div>
+          <DialogFooter className="mt-4 gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setClearAllDialogOpen(false)}
+              disabled={clearAllLoading}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleClearAllBookings}
+              disabled={clearAllLoading || clearAllConfirmText !== CLEAR_ALL_CONFIRM_PHRASE}
+              className="bg-red-700 hover:bg-red-600 text-white"
+            >
+              {clearAllLoading ? 'Deleting...' : 'Delete Everything'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

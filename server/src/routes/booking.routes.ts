@@ -16,6 +16,7 @@ import {
   getManageBooking,
   joinBookingQueue,
   sendBookingMessage,
+  clearAllBookingsAndQueue,
 } from '../controllers/booking.controller';
 import { isAdmin } from '../middleware/isAdmin';
 
@@ -49,6 +50,7 @@ router.patch('/manage/:id/cancel', cancelBooking);
 
 // ADMIN ROUTES
 router.get('/', isAdmin, getAllBookings);
+router.delete('/admin/clear-all', isAdmin, clearAllBookingsAndQueue);
 router.patch('/:id/confirm-payment', isAdmin, confirmPayment);
 router.put('/:id', isAdmin, updateBooking);
 router.patch('/:id/cancel', isAdmin, cancelBooking);
