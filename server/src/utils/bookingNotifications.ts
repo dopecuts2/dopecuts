@@ -5,6 +5,12 @@ import { Booking, IBooking } from '../models/booking.model';
 const MANAGE_LINK = 'https://dopecuts.online/reschedule';
 export const SHOP_ADDRESS = '646 Upper James Street, Hamilton, ON L9C 2Z2';
 export const SHOP_MAPS_LINK = 'https://maps.google.com/?q=646+Upper+James+Street+Hamilton+ON+L9C+2Z2';
+export const SHOP_PHONE = '(365) 323-3680';
+export const SHOP_EMAIL = 'leeroy@dopecuts.ca';
+export const RESTRICTED_BOOKING_MESSAGE =
+  `This phone number has been restricted from booking online. ` +
+  `Please contact DopeCuts to resolve this -- call ${SHOP_PHONE}, email ${SHOP_EMAIL}, ` +
+  `or use the contact form at dopecuts.online/contact.`;
 
 const REFERENCE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no 0/O/1/I, easy to read aloud
 

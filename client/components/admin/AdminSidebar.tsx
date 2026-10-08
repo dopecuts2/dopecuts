@@ -18,6 +18,7 @@ import {
   Paperclip,
   Share2,
   Info,
+  ShieldBan,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -36,6 +37,7 @@ const navItems: NavItem[] = [
   { title: 'Booking', href: '/admin/booking', icon: Calendar },
   { title: 'Queue', href: '/admin/queue', icon: CalendarClock },
   { title: 'Availability', href: '/admin/calendar', icon: CalendarClock },
+  { title: 'Restrictions', href: '/admin/restrictions', icon: ShieldBan },
 
   // Catalog
   { title: 'Services', href: '/admin/services', icon: Scissors },
