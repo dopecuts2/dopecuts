@@ -72,12 +72,27 @@ app.get('/health', (req: Request, res: Response) => {
 
 
 
-app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
-  
-  logger.error(err.message);
-  
-  res.status(500).send('Something went wrong!');
-  
+app.use((err: any, req: Request, res: Response, next: NextFunction) => {
+
+  logger.error(err?.message || err);
+
+  // Multer's own errors (oversized file, too many files, unexpected field)
+  // and our custom image-type check both carry a message that's already
+  // safe and specific to show the admin -- surface it as JSON instead of
+  // the generic fallback below.
+  if (err?.name === 'MulterError') {
+    const message =
+      err.code === 'LIMIT_FILE_SIZE'
+        ? 'Image is too large. Please upload a file under 10MB.'
+        : err.message || 'File upload failed.';
+    return res.status(400).json({ message });
+  }
+  if (err?.message === 'Not an image! Please upload only images.') {
+    return res.status(400).json({ message: err.message });
+  }
+
+  res.status(500).json({ message: 'Something went wrong!' });
+
 });
 
 
