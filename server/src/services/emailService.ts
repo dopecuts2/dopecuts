@@ -232,6 +232,8 @@ export const sendBookingPendingEmail = async (bookingDetails: IBooking) => {
         <tr><td style="padding: 8px; border: 1px solid #ddd;">Total:</td><td style="padding: 8px; border: 1px solid #ddd;"><strong>$${price}</strong></td></tr>
       </table>
       ${renderGuestSection(bookingDetails.additionalGuests)}
+      ${locationBlock()}
+      ${calendarButtonBlock(bookingDetails)}
       <p>You will receive another email once your booking is fully confirmed. No further action is needed from you at this time.</p>
       ${manageAppointmentBlock('Need to make changes while you wait?')}
       <p style="margin-top:20px;">Thanks,<br/>The Dopecuts Team</p>
