@@ -9,6 +9,7 @@ export interface IService {
     duration: number; // in minutes
     price: number;
     description?: string; // <-- ADDED
+    isVisible?: boolean; // false = hidden from the public booking site; defaults to true
     createdAt: string;
     updatedAt: string;
 }
@@ -37,6 +38,15 @@ export async function getServiceById(id: string): Promise<IService> {
 }
 
 // --- Admin-Only API Functions ---
+
+/**
+ * Get every service, including hidden ones, for the admin Services page.
+ * @access Private (Admin only)
+ */
+export async function getAllServicesForAdmin(): Promise<IService[]> {
+    const response = await apiClient.get<IService[]>('/services/admin/all');
+    return response.data;
+}
 
 /**
  * Create a new service.

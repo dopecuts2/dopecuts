@@ -32,16 +32,36 @@ export const createService = async (req: Request, res: Response) => {
 };
 
 /**
- * @description Get all services.
+ * @description Get all services visible to the public (excludes hidden
+ * services). This is what the public booking site shows.
  * @route GET /api/v1/services
- * @access Private (Admin only)
+ * @access Public
  */
 export const getAllServices = async (req: Request, res: Response) => {
+  try {
+    // $ne: false (rather than isVisible: true) also matches services
+    // saved before this field existed, so nothing already in the
+    // database gets hidden by accident.
+    const services = await Service.find({ isVisible: { $ne: false } }).sort({ createdAt: -1 });
+    res.status(200).json(services);
+  } catch (error) {
+    logger.error('Error fetching services:', error);
+    res.status(500).json({ message: 'Failed to fetch services.' });
+  }
+};
+
+/**
+ * @description Get every service, including hidden ones, for the admin
+ * Services management page.
+ * @route GET /api/v1/services/admin/all
+ * @access Private (Admin only)
+ */
+export const getAllServicesForAdmin = async (req: Request, res: Response) => {
   try {
     const services = await Service.find().sort({ createdAt: -1 });
     res.status(200).json(services);
   } catch (error) {
-    logger.error('Error fetching services:', error);
+    logger.error('Error fetching services for admin:', error);
     res.status(500).json({ message: 'Failed to fetch services.' });
   }
 };
@@ -71,10 +91,10 @@ export const getServiceById = async (req: Request, res: Response) => {
  */
 export const updateService = async (req: Request, res: Response) => {
   const { id } = req.params;
-  const { name, duration, price, description } = req.body;
+  const { name, duration, price, description, isVisible } = req.body;
 
-  if (!name && duration === undefined && price === undefined && description === undefined) {
-    return res.status(400).json({ message: 'At least one field (name, duration, price, description) must be provided for update.' });
+  if (!name && duration === undefined && price === undefined && description === undefined && isVisible === undefined) {
+    return res.status(400).json({ message: 'At least one field (name, duration, price, description, isVisible) must be provided for update.' });
   }
 
   try {

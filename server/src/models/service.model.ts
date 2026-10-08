@@ -6,6 +6,9 @@ export interface IService extends Document {
   duration: number; // Duration in minutes
   price: number;
   description?: string;
+  // When false, the service is hidden from the public booking site but
+  // stays intact in the admin panel so it can be un-hidden later.
+  isVisible: boolean;
 }
 
 const serviceSchema = new Schema<IService>({
@@ -31,8 +34,13 @@ const serviceSchema = new Schema<IService>({
     required: true 
   },
 
-  description: { 
+  description: {
     type: String,
+  },
+  isVisible: {
+    type: Boolean,
+    required: true,
+    default: true,
   },
 }, { timestamps: true });
 
