@@ -518,31 +518,18 @@ export default function CalendarManagement() {
     scheduleAutoSave();
   };
 
-  // Turning "Use Default Hours" on both flips the flag and instantly fills
-  // in the current default values, so the toggle and the fields it shows
-  // never disagree while waiting on the next save/refetch. Turning it off
-  // just unlocks editing -- whatever values are already shown (the
-  // defaults, since the day was following them) become the starting point.
-  const toggleUseDefault = (weekIndex: number, dayIndex: number, dayOfWeek: string, useDefault: boolean) => {
-    if (useDefault) {
-      const defaults = DEFAULT_SCHEDULE[dayOfWeek];
-      updateDay(weekIndex, dayIndex, {
-        useDefaultHours: true,
-        startTime: defaults.startTime,
-        endTime: defaults.endTime,
-        slotDuration: defaultSlotDuration,
-        isEnabled: defaults.isEnabled,
-        blockedTimes: defaults.breaks.map((b) => ({ ...b, isEnabled: true })),
-      });
-    } else {
-      updateDay(weekIndex, dayIndex, { useDefaultHours: false });
-    }
-  };
-
-  const applyDefaultsToWeek = (weekIndex: number) => {
+  // A single switch per week: on (the standing default for every week),
+  // all 7 days dynamically follow the Default Schedule and instantly show
+  // its current values. Off, every day's current values (the defaults,
+  // since it was just following them) freeze into an editable custom
+  // schedule for that one week only -- every other week stays on default.
+  const toggleWeekDefault = (weekIndex: number, useDefault: boolean) => {
     const targetWeek = weeks[weekIndex];
     if (!targetWeek) return;
     const days = targetWeek.days.map((day) => {
+      if (!useDefault) {
+        return { ...day, useDefaultHours: false };
+      }
       const defaults = DEFAULT_SCHEDULE[day.dayOfWeek];
       return {
         ...day,
@@ -961,19 +948,24 @@ export default function CalendarManagement() {
                       className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white"
                     />
                   </div>
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-4">
                     <p className="text-sm text-white font-semibold">
                       {moment(selectedWeek.weekStart).format('MMMM D, YYYY')}
                     </p>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => applyDefaultsToWeek(selectedWeekIdx)}
-                    >
-                      Use default schedule for this week
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      <Label className="text-xs text-gray-400 uppercase tracking-wide">
+                        Default Schedule
+                      </Label>
+                      <Switch
+                        checked={selectedWeek.days.every((d) => d.useDefaultHours)}
+                        onCheckedChange={(checked) => toggleWeekDefault(selectedWeekIdx, checked)}
+                      />
+                    </div>
                   </div>
                 </div>
+                <p className="text-xs text-gray-400 -mt-2">
+                  On by default for every week. Turn off to set your own hours just for this week.
+                </p>
                 <div className="grid gap-3">
                   {selectedWeek.days
                     .map((day, dayIndex) => ({ day, dayIndex }))
@@ -1000,17 +992,6 @@ export default function CalendarManagement() {
                         </p>
                         <div className="flex flex-wrap items-center gap-4">
                           <div className="flex items-center gap-2">
-                            <Label className="text-xs text-gray-400 uppercase tracking-wide">
-                              Use Default
-                            </Label>
-                            <Switch
-                              checked={day.useDefaultHours}
-                              onCheckedChange={(checked) =>
-                                toggleUseDefault(selectedWeekIdx, dayIndex, day.dayOfWeek, checked)
-                              }
-                            />
-                          </div>
-                          <div className="flex items-center gap-2">
                             {!day.isEnabled && (
                               <span className="text-xs text-amber-200 uppercase tracking-wide">
                                 closed
@@ -1032,7 +1013,7 @@ export default function CalendarManagement() {
                       {day.useDefaultHours ? (
                         <p className="text-sm text-gray-300 bg-gray-900/60 border border-gray-800 rounded-lg px-3 py-2">
                           Following the Default Schedule: {describeDefaultSchedule(day.dayOfWeek)}.
-                          Turn off Use Default to customize this day.
+                          Turn off the Default Schedule switch above to customize this week.
                         </p>
                       ) : (
                         <>
