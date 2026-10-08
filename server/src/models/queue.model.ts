@@ -20,6 +20,7 @@ export interface IQueueEntry extends Document {
     firstName: string;
     lastName?: string;
     email?: string;
+    phone?: string;
   }>;
 }
 
@@ -49,6 +50,7 @@ const queueEntrySchema = new Schema<IQueueEntry>({
         firstName: { type: String, required: true },
         lastName: { type: String, required: false, default: '' },
         email: { type: String },
+        phone: { type: String },
       },
     ],
     default: [],
