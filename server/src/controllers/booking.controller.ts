@@ -789,6 +789,82 @@ export const verifyEmailOtp = async (req: Request, res: Response) => {
 };
 
 /**
+ * Start a reference-number-based manage lookup (public).
+ * Requires the booking's reference number plus either its email or phone
+ * (customer's choice) to match before a verification code is sent -- the
+ * code itself always goes to the booking's own email, regardless of which
+ * contact method was used to look it up.
+ */
+export const startManageLookup = async (req: Request, res: Response) => {
+  const { referenceNumber, email, phone } = req.body;
+  if (!referenceNumber || (!email && !phone)) {
+    return res.status(400).json({ message: 'Reference number and email or phone are required.' });
+  }
+
+  try {
+    const booking = await Booking.findOne({
+      referenceNumber: String(referenceNumber).trim().toUpperCase(),
+    });
+
+    const matches =
+      booking &&
+      ((email && booking.email === String(email).trim().toLowerCase()) ||
+        (phone && normalizePhoneDigits(phone) === booking.phoneNormalized));
+
+    // Same generic response whether the reference number doesn't exist or
+    // the contact info doesn't match it, so a lookup attempt can't be used
+    // to probe for valid reference numbers.
+    if (!matches || !booking) {
+      return res.status(401).json({ message: "Reference number and contact info don't match." });
+    }
+
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    await Otp.create({ email: booking.email, otp });
+    const out = await sendCustomerVerificationCodeEmail(booking.email, otp);
+    if (!out.success) {
+      return res.status(429).json({ message: 'Unable to send verification code right now. Try again shortly.' });
+    }
+
+    res.status(200).json({ message: 'Verification code sent to the email on file.' });
+  } catch (error) {
+    logger.error('Error starting manage lookup:', error);
+    res.status(500).json({ message: 'Failed to start verification.' });
+  }
+};
+
+/**
+ * Verify the code from startManageLookup -> returns a manage token scoped
+ * to this specific booking's reference number.
+ */
+export const verifyManageLookup = async (req: Request, res: Response) => {
+  const { referenceNumber, otp } = req.body;
+  if (!referenceNumber || !otp) {
+    return res.status(400).json({ message: 'Reference number and code are required.' });
+  }
+
+  try {
+    const booking = await Booking.findOne({
+      referenceNumber: String(referenceNumber).trim().toUpperCase(),
+    });
+    if (!booking) {
+      return res.status(401).json({ message: 'Invalid or expired code.' });
+    }
+
+    const record = await Otp.findOne({ email: booking.email, otp }).sort({ createdAt: -1 });
+    if (!record) {
+      return res.status(401).json({ message: 'Invalid or expired code.' });
+    }
+    await Otp.deleteMany({ email: booking.email });
+
+    const token = signManageToken({ referenceNumber: booking.referenceNumber });
+    res.status(200).json({ message: 'Verified.', token });
+  } catch (error) {
+    logger.error('Error verifying manage lookup:', error);
+    res.status(500).json({ message: 'Verification failed.' });
+  }
+};
+
+/**
  * Token-based "manage" lookup (public)
  */
 export const getManageBooking = async (req: Request, res: Response) => {
@@ -798,6 +874,14 @@ export const getManageBooking = async (req: Request, res: Response) => {
 
     const idt = verifyManageToken(token);
     if (!idt) return res.status(401).json({ message: 'Invalid manage token.' });
+
+    if (idt.referenceNumber) {
+      const booking = await Booking.findOne({ referenceNumber: idt.referenceNumber });
+      if (!booking) {
+        return res.status(404).json({ message: 'Booking not found.' });
+      }
+      return res.status(200).json({ booking });
+    }
 
     const today = moment.utc().startOf('day').toDate();
 

@@ -121,6 +121,17 @@ export interface VerifyResponse {
   token: string; // manage token (JWT)
 }
 
+export interface ManageLookupStartPayload {
+  referenceNumber: string;
+  email?: string;
+  phone?: string;
+}
+
+export interface ManageLookupVerifyPayload {
+  referenceNumber: string;
+  otp: string;
+}
+
 export interface ManageLookupResponse {
   booking: IBooking;
 }
@@ -253,6 +264,25 @@ export async function verifyEmailOtp(payload: EmailOtpVerifyPayload): Promise<Ve
     `/bookings/email-otp/verify`,
     payload
   );
+  return response.data;
+}
+
+/**
+ * Start a reference-number-based manage lookup (public).
+ * Requires the booking's reference number plus its email or phone; sends
+ * a verification code to the booking's email on a match.
+ */
+export async function startManageLookup(payload: ManageLookupStartPayload): Promise<{ message: string }> {
+  const response = await apiClient.post<{ message: string }>('/bookings/manage-lookup/start', payload);
+  return response.data;
+}
+
+/**
+ * Verify the code from startManageLookup. Returns a short-lived manage
+ * token scoped to that specific booking.
+ */
+export async function verifyManageLookup(payload: ManageLookupVerifyPayload): Promise<VerifyResponse> {
+  const response = await apiClient.post<VerifyResponse>('/bookings/manage-lookup/verify', payload);
   return response.data;
 }
 

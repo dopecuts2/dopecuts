@@ -1,7 +1,7 @@
 import jwt from 'jsonwebtoken';
 import { JWT_SECRET } from '../config/env';
 
-type ManageIdentity = { phone?: string; email?: string };
+type ManageIdentity = { phone?: string; email?: string; referenceNumber?: string };
 
 const DEFAULT_TTL_MIN = 15; // 15 minutes
 
@@ -13,8 +13,8 @@ export function signManageToken(identity: ManageIdentity, ttlMinutes = DEFAULT_T
 export function verifyManageToken(token: string): ManageIdentity | null {
   try {
     const decoded = jwt.verify(token, JWT_SECRET) as ManageIdentity & { typ?: string };
-    if (decoded && decoded.typ === 'manage' && (decoded.phone || decoded.email)) {
-      return { phone: decoded.phone, email: decoded.email };
+    if (decoded && decoded.typ === 'manage' && (decoded.phone || decoded.email || decoded.referenceNumber)) {
+      return { phone: decoded.phone, email: decoded.email, referenceNumber: decoded.referenceNumber };
     }
     return null;
   } catch {
