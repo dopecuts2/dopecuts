@@ -217,15 +217,28 @@ export default function BookingManagement() {
   };
 
   // Actions
+  const [confirmingId, setConfirmingId] = useState<string | null>(null);
+
   const handleConfirmBooking = async (bookingId: string) => {
+    if (confirmingId) return;
+    setConfirmingId(bookingId);
     try {
       const { booking: updatedBooking } = await confirmPayment(bookingId);
       setBookings((prev) =>
-        prev.map((b) => (b._id === bookingId ? { ...b, status: updatedBooking.status } : b))
+        prev.map((b) => (b._id === bookingId ? { ...b, status: updatedBooking?.status ?? 'confirmed' } : b))
       );
-    } catch (err) {
+      toast.success('Booking confirmed.');
+    } catch (err: any) {
       console.error('Failed to confirm booking:', err);
-      toast.error('Could not confirm the booking.');
+      const status = err?.response?.status;
+      const serverMsg = err?.response?.data?.message;
+      if (status === 401) {
+        toast.error('Your admin session expired. Please log in again.');
+      } else {
+        toast.error(serverMsg || 'Could not confirm the booking.');
+      }
+    } finally {
+      setConfirmingId(null);
     }
   };
 
@@ -671,18 +684,19 @@ export default function BookingManagement() {
 
                         {/* Action Buttons */}
                         <div className="flex flex-col gap-2 lg:w-36 pt-3 lg:pt-0 border-t lg:border-t-0 lg:border-l border-gray-600 lg:pl-4">
+                          {booking.status === 'pending' && (
+                            <Button
+                              size="sm"
+                              onClick={() => handleConfirmBooking(booking._id)}
+                              disabled={confirmingId === booking._id}
+                              className="bg-green-600 hover:bg-green-700 text-white w-full"
+                            >
+                              <CheckCircle className="h-4 w-4 mr-1" />
+                              {confirmingId === booking._id ? 'Confirming…' : 'Confirm'}
+                            </Button>
+                          )}
                           {!isPastBooking ? (
                             <>
-                              {booking.status === 'pending' && (
-                                <Button
-                                  size="sm"
-                                  onClick={() => handleConfirmBooking(booking._id)}
-                                  className="bg-green-600 hover:bg-green-700 text-white w-full"
-                                >
-                                  <CheckCircle className="h-4 w-4 mr-1" />
-                                  Confirm
-                                </Button>
-                              )}
 
                               {booking.status !== 'cancelled' && (
                                 <>

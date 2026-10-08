@@ -1184,7 +1184,11 @@ export const cancelBooking = async (req: Request, res: Response) => {
     }
 
     booking.status = 'cancelled';
-    await booking.save();
+    // Write only the changed fields (see confirmPayment: full save() fails on legacy docs).
+    await Booking.updateOne(
+      { _id: booking._id },
+      { $set: { status: 'cancelled', ...(cancellationNote ? { cancellationNote } : {}) } }
+    );
 
     assignQueueEntryForSlot(booking).catch((err) =>
       logger.error('Queue assignment after cancel failed:', err)
@@ -1255,33 +1259,53 @@ export const sendBookingMessage = async (req: Request, res: Response) => {
  */
 export const confirmPayment = async (req: Request, res: Response) => {
   const { id } = req.params;
+
+  if (!Types.ObjectId.isValid(id)) {
+    return res.status(400).json({ message: 'Invalid booking id.' });
+  }
+
   try {
-    const booking = await Booking.findById(id);
+    // Atomic status flip. We deliberately avoid `booking.save()` here: save()
+    // re-validates the WHOLE document, so older bookings created before fields
+    // like `referenceNumber` / `phoneNormalized` became required (or that still
+    // carry the legacy paymentMethod 'later') fail validation and the confirm
+    // silently 500s. Only the status changes, so only the status is written.
+    const updatedBooking = await Booking.findOneAndUpdate(
+      { _id: id, status: 'pending' },
+      { $set: { status: 'confirmed' } },
+      { new: true, runValidators: false }
+    );
 
-    if (!booking) {
-      return res.status(404).json({ message: 'Booking not found.' });
+    if (!updatedBooking) {
+      const existing = await Booking.findById(id).select('status').lean();
+      if (!existing) {
+        return res.status(404).json({ message: 'Booking not found.' });
+      }
+      if (existing.status === 'confirmed') {
+        // Idempotent: a double-tap or retry shouldn't show an error.
+        const current = await Booking.findById(id);
+        return res.status(200).json({ message: 'Booking is already confirmed.', booking: current });
+      }
+      return res.status(400).json({ message: `This booking is ${existing.status} and cannot be confirmed.` });
     }
 
-    if (booking.status !== 'pending') {
-      return res.status(400).json({ message: 'This booking is not pending payment and cannot be confirmed.' });
-    }
+    // Respond right away; notifications run in the background so a slow or
+    // failing email/SMS provider can't make the confirm look broken.
+    res.status(200).json({ message: 'Booking confirmed.', booking: updatedBooking });
 
-    booking.status = 'confirmed';
-    const updatedBooking = await booking.save();
-
-    // Email
     sendPaymentConfirmationEmail(updatedBooking)
-      .catch(err => logger.error("Failed to send payment confirmation email:", err));
+      .catch(err => logger.error('Failed to send payment confirmation email:', err));
 
-    // SMS
-    const cSmsText = buildCustomerSms('payment-confirmed', updatedBooking);
-    const cSms = await safeSendSms(updatedBooking.phone, cSmsText);
-    logSmsOutcome('confirmPayment', 'customer', updatedBooking.phone, cSms);
+    (async () => {
+      const cSmsText = buildCustomerSms('payment-confirmed', updatedBooking);
+      const cSms = await safeSendSms(updatedBooking.phone, cSmsText);
+      logSmsOutcome('confirmPayment', 'customer', updatedBooking.phone, cSms);
+    })().catch(err => logger.error('Failed to send payment confirmation SMS:', err));
 
-    res.status(200).json({ message: 'Payment confirmed and booking is now confirmed.', booking: updatedBooking });
-
-  } catch (error) {
-    logger.error(`Error confirming payment for booking ${id}:`, error);
-    res.status(500).json({ message: 'Failed to confirm payment.' });
+  } catch (error: any) {
+    logger.error(`Error confirming booking ${id}:`, error);
+    if (!res.headersSent) {
+      res.status(500).json({ message: `Failed to confirm booking: ${error?.message || 'unknown error'}` });
+    }
   }
 };
