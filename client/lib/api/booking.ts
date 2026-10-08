@@ -6,6 +6,7 @@ export interface AdditionalGuest {
   firstName: string;
   lastName?: string;
   email?: string;
+  phone?: string;
   serviceId: string;
   time: string;
   serviceName?: string;
@@ -27,6 +28,7 @@ export interface IBooking {
   status: 'pending' | 'confirmed' | 'cancelled';
   serviceId?: string;
   phoneNormalized?: string;
+  referenceNumber: string;
   additionalGuests?: AdditionalGuest[];
   cancellationNote?: string;
   createdAt: string;

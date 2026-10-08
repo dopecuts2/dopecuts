@@ -5,11 +5,36 @@ import { RESEND_API_KEY, ADMIN_EMAIL } from '../config/env';
 import { IBooking } from '../models/booking.model';
 import { logger } from '../utils/logger';
 import { getNotificationSettings } from './notificationSettingsService';
+import { SHOP_ADDRESS, SHOP_MAPS_LINK, buildGoogleCalendarLink } from '../utils/bookingNotifications';
 
 const SENDER_EMAIL = 'Roy @ Dopecuts <leeroy@emails.dopecuts.online>';
 
 // Centralized manage URL provided by product
 const MANAGE_URL = 'https://dopecuts.online/reschedule';
+
+/**
+ * "Add to Google Calendar" button, shared by both the customer and owner
+ * confirmation emails -- no account linking needed, it's just a prefilled
+ * Google Calendar link the recipient taps to add the event to their own.
+ */
+const calendarButtonBlock = (booking: Pick<IBooking, 'date' | 'time' | 'duration' | 'service'>) => `
+  <div style="margin-top: 16px;">
+    <a href="${buildGoogleCalendarLink(booking)}"
+       style="display:inline-block;padding:12px 18px;border-radius:6px;
+              background:#4285F4;color:#fff;text-decoration:none;font-weight:600;">
+      Add to Google Calendar
+    </a>
+  </div>
+`;
+
+const locationBlock = () => `
+  <p style="margin: 12px 0 0 0;">
+    <strong>Location:</strong> DopeCuts (inside Elite Barbershop)<br/>
+    ${SHOP_ADDRESS}
+    &nbsp;&middot;&nbsp;
+    <a href="${SHOP_MAPS_LINK}" style="color:#111;">Get Directions</a>
+  </p>
+`;
 
 // Lazily instantiate Resend only if we have an API key
 const haveResend = !!RESEND_API_KEY;
@@ -46,6 +71,7 @@ const renderGuestSection = (guests?: IBooking['additionalGuests']) => {
           <td style="padding: 8px; border: 1px solid #ddd;">${guest.firstName} ${guest.lastName}</td>
           <td style="padding: 8px; border: 1px solid #ddd;">${guestService}</td>
           <td style="padding: 8px; border: 1px solid #ddd;">${guestTime}</td>
+          <td style="padding: 8px; border: 1px solid #ddd;">${guest.phone || 'Not provided'}</td>
           <td style="padding: 8px; border: 1px solid #ddd;">${guest.email || 'No email provided'}</td>
         </tr>
       `;
@@ -61,6 +87,7 @@ const renderGuestSection = (guests?: IBooking['additionalGuests']) => {
             <th style="padding: 8px; border: 1px solid #ddd; text-align: left;">Name</th>
             <th style="padding: 8px; border: 1px solid #ddd; text-align: left;">Service</th>
             <th style="padding: 8px; border: 1px solid #ddd; text-align: left;">Time</th>
+            <th style="padding: 8px; border: 1px solid #ddd; text-align: left;">Phone</th>
             <th style="padding: 8px; border: 1px solid #ddd; text-align: left;">Email</th>
           </tr>
         </thead>
@@ -154,7 +181,7 @@ export const sendOtpEmail = async (email: string, otp: string) => {
 };
 
 export const sendBookingConfirmationEmail = async (bookingDetails: IBooking) => {
-  const { email, firstName, service, date, time, price, duration } = bookingDetails;
+  const { email, firstName, service, date, time, price, duration, referenceNumber } = bookingDetails;
   const formattedDate = moment(date).format('MMMM DD, YYYY');
 
   const subject = 'Your Dopecuts Appointment is Confirmed!';
@@ -163,6 +190,7 @@ export const sendBookingConfirmationEmail = async (bookingDetails: IBooking) => 
       <h2>Hey ${firstName}, your booking is confirmed!</h2>
       <p>We’re excited to see you. Here are your appointment details:</p>
       <table style="width: 100%; border-collapse: collapse;">
+        <tr><td style="padding: 8px; border: 1px solid #ddd;">Reference #:</td><td style="padding: 8px; border: 1px solid #ddd;"><strong>${referenceNumber}</strong></td></tr>
         <tr><td style="padding: 8px; border: 1px solid #ddd;">Service:</td><td style="padding: 8px; border: 1px solid #ddd;"><strong>${service}</strong></td></tr>
         <tr><td style="padding: 8px; border: 1px solid #ddd;">Date:</td><td style="padding: 8px; border: 1px solid #ddd;"><strong>${formattedDate}</strong></td></tr>
         <tr><td style="padding: 8px; border: 1px solid #ddd;">Time:</td><td style="padding: 8px; border: 1px solid #ddd;"><strong>${time}</strong></td></tr>
@@ -170,7 +198,8 @@ export const sendBookingConfirmationEmail = async (bookingDetails: IBooking) => 
         <tr><td style="padding: 8px; border: 1px solid #ddd;">Total:</td><td style="padding: 8px; border: 1px solid #ddd;"><strong>$${price}</strong></td></tr>
       </table>
       ${renderGuestSection(bookingDetails.additionalGuests)}
-      <p><strong>Location:</strong> 646 Upper James Street, Hamilton ON, L9C 2Z2</p>
+      ${locationBlock()}
+      ${calendarButtonBlock(bookingDetails)}
       <p>If you need to cancel or reschedule, please do so at least 24 hours in advance.</p>
       ${manageAppointmentBlock()}
       <p style="margin-top:20px;">See you soon,<br/>The Dopecuts Team</p>
@@ -186,7 +215,7 @@ export const sendBookingConfirmationEmail = async (bookingDetails: IBooking) => 
 
 // NEW: Pending (customer)
 export const sendBookingPendingEmail = async (bookingDetails: IBooking) => {
-  const { email, firstName, service, date, time, price, duration } = bookingDetails;
+  const { email, firstName, service, date, time, price, duration, referenceNumber } = bookingDetails;
   const formattedDate = moment(date).format('MMMM DD, YYYY');
 
   const subject = 'Your Dopecuts Appointment is Pending Confirmation';
@@ -195,6 +224,7 @@ export const sendBookingPendingEmail = async (bookingDetails: IBooking) => {
       <h2>Hey ${firstName}, we’ve received your booking request!</h2>
       <p>Your appointment is currently <strong>pending</strong>. We will confirm it as soon as your payment is processed. Here are the details of your request:</p>
       <table style="width: 100%; border-collapse: collapse;">
+        <tr><td style="padding: 8px; border: 1px solid #ddd;">Reference #:</td><td style="padding: 8px; border: 1px solid #ddd;"><strong>${referenceNumber}</strong></td></tr>
         <tr><td style="padding: 8px; border: 1px solid #ddd;">Service:</td><td style="padding: 8px; border: 1px solid #ddd;"><strong>${service}</strong></td></tr>
         <tr><td style="padding: 8px; border: 1px solid #ddd;">Date:</td><td style="padding: 8px; border: 1px solid #ddd;"><strong>${formattedDate}</strong></td></tr>
         <tr><td style="padding: 8px; border: 1px solid #ddd;">Time:</td><td style="padding: 8px; border: 1px solid #ddd;"><strong>${time}</strong></td></tr>
@@ -217,7 +247,7 @@ export const sendBookingPendingEmail = async (bookingDetails: IBooking) => {
 
 // NEW: Payment (customer)
 export const sendPaymentConfirmationEmail = async (bookingDetails: IBooking) => {
-  const { email, firstName, service, date, time } = bookingDetails;
+  const { email, firstName, service, date, time, referenceNumber } = bookingDetails;
   const formattedDate = moment(date).format('MMMM DD, YYYY');
 
   const subject = 'Payment Received - Your Dopecuts Appointment is Confirmed!';
@@ -225,9 +255,12 @@ export const sendPaymentConfirmationEmail = async (bookingDetails: IBooking) => 
     <div style="font-family: Arial, sans-serif; color: #333;">
       <h2>Hey ${firstName}, your payment has been confirmed!</h2>
       <p>Your appointment is now fully confirmed. We’re excited to see you.</p>
+      <p><strong>Reference #:</strong> ${referenceNumber}</p>
       <p><strong>Service:</strong> ${service}</p>
       <p><strong>Date:</strong> ${formattedDate}</p>
       <p><strong>Time:</strong> ${time}</p>
+      ${locationBlock()}
+      ${calendarButtonBlock(bookingDetails)}
       ${manageAppointmentBlock()}
       <p style="margin-top:20px;">See you soon,<br/>The Dopecuts Team</p>
     </div>
@@ -242,7 +275,7 @@ export const sendPaymentConfirmationEmail = async (bookingDetails: IBooking) => 
 
 // Admin: New booking
 export const sendAdminNotificationEmail = async (bookingDetails: IBooking) => {
-  const { firstName, lastName, service, date, time, phone, email, notes, price, status } = bookingDetails;
+  const { firstName, lastName, service, date, time, phone, email, notes, price, status, referenceNumber } = bookingDetails;
   const formattedDate = moment(date).format('MMMM DD, YYYY');
   const statusText = status.charAt(0).toUpperCase() + status.slice(1);
 
@@ -252,6 +285,7 @@ export const sendAdminNotificationEmail = async (bookingDetails: IBooking) => {
       <h2>New Appointment Booked!</h2>
       <p>A new appointment has been scheduled. Details below:</p>
       <table style="width: 100%; border-collapse: collapse;">
+        <tr><td style="padding: 8px; border: 1px solid #ddd;">Reference #:</td><td style="padding: 8px; border: 1px solid #ddd;"><strong>${referenceNumber}</strong></td></tr>
         <tr><td style="padding: 8px; border: 1px solid #ddd;">Status:</td><td style="padding: 8px; border: 1px solid #ddd;"><strong>${statusText}</strong></td></tr>
         <tr><td style="padding: 8px; border: 1px solid #ddd;">Customer:</td><td style="padding: 8px; border: 1px solid #ddd;"><strong>${firstName} ${lastName}</strong></td></tr>
         <tr><td style="padding: 8px; border: 1px solid #ddd;">Email:</td><td style="padding: 8px; border: 1px solid #ddd;">${email}</td></tr>
@@ -263,6 +297,7 @@ export const sendAdminNotificationEmail = async (bookingDetails: IBooking) => {
         ${notes ? `<tr><td style="padding: 8px; border: 1px solid #ddd;">Notes:</td><td style="padding: 8px; border: 1px solid #ddd;">${notes}</td></tr>` : ''}
       </table>
       ${renderGuestSection(bookingDetails.additionalGuests)}
+      ${calendarButtonBlock(bookingDetails)}
     </div>
   `;
 

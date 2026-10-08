@@ -7,7 +7,7 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import PhoneInput from 'react-phone-number-input';
 import 'react-phone-number-input/style.css';
 import { isValidPhoneNumber, E164Number } from 'libphonenumber-js';
-import { Scissors, Calendar, X, Clock, User, CreditCard, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
+import { Scissors, Calendar, X, Clock, User, CreditCard, ChevronLeft, ChevronRight, Loader2, Copy, MapPin } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -53,10 +53,14 @@ interface AvailableDate {
   isDisabled?: boolean;
 }
 
+const SHOP_ADDRESS = '646 Upper James Street, Hamilton, ON L9C 2Z2';
+const SHOP_MAPS_LINK = 'https://maps.google.com/?q=646+Upper+James+Street+Hamilton+ON+L9C+2Z2';
+
 interface GuestEntry {
   firstName: string;
   lastName: string;
   email?: string;
+  phone?: string;
   serviceId: string;
   time: string;
 }
@@ -577,6 +581,7 @@ export default function BookAppointment() {
         firstName: guest.firstName,
         lastName: guest.lastName || '',
         email: guest.email || undefined,
+        phone: guest.phone || undefined,
         serviceId: guest.serviceId,
         time: guest.time,
       }));
@@ -787,7 +792,22 @@ export default function BookAppointment() {
               )}
 
               <div className="bg-gray-700 p-6 rounded-lg border border-gray-600 mb-8">
-                <h3 className="text-lg font-bold text-white mb-4">Appointment Details</h3>
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-bold text-white">Appointment Details</h3>
+                  {confirmedBooking.referenceNumber && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText(confirmedBooking.referenceNumber);
+                        toast.success('Reference number copied!');
+                      }}
+                      className="flex items-center gap-1.5 text-sm text-gray-300 hover:text-white border border-gray-600 rounded-lg px-2.5 py-1"
+                    >
+                      <span className="font-mono">{confirmedBooking.referenceNumber}</span>
+                      <Copy className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                </div>
                 <div className="space-y-3 text-left">
                   <div className="flex justify-between">
                     <span className="text-gray-300">Service:</span>
@@ -838,7 +858,32 @@ export default function BookAppointment() {
                 </div>
               </div>
 
+              <div className="bg-gray-700 p-6 rounded-lg border border-gray-600 mb-8 text-left">
+                <p className="text-white font-medium">DopeCuts (inside Elite Barbershop)</p>
+                <div className="flex items-center gap-2 mt-1">
+                  <span className="text-gray-300 text-sm">{SHOP_ADDRESS}</span>
+                  <a
+                    href={SHOP_MAPS_LINK}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label="Get directions"
+                    className="text-gray-300 hover:text-white"
+                  >
+                    <MapPin className="h-4 w-4" />
+                  </a>
+                </div>
+              </div>
+
               <div className="space-y-4">
+                <a href={SHOP_MAPS_LINK} target="_blank" rel="noopener noreferrer" className="block">
+                  <Button
+                    variant="outline"
+                    className="w-full border-gray-600 text-black hover:bg-gray-700 hover:text-white py-3"
+                  >
+                    <MapPin className="h-4 w-4 mr-2" />
+                    Get Directions
+                  </Button>
+                </a>
                 <Button
                   onClick={handleBookingComplete}
                   className="w-full bg-white text-black hover:bg-gray-200 py-3"
@@ -1417,6 +1462,18 @@ export default function BookAppointment() {
                                         updateGuestEntry(index, { email: e.target.value })
                                       }
                                       placeholder="Email address"
+                                      className="mt-2 bg-gray-900 border-gray-600 text-white"
+                                    />
+                                  </div>
+                                  <div>
+                                    <Label className="text-white font-medium text-xs">Phone (optional)</Label>
+                                    <Input
+                                      type="tel"
+                                      value={guest.phone || ''}
+                                      onChange={(e) =>
+                                        updateGuestEntry(index, { phone: e.target.value })
+                                      }
+                                      placeholder="Phone number"
                                       className="mt-2 bg-gray-900 border-gray-600 text-white"
                                     />
                                   </div>

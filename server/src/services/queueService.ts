@@ -10,7 +10,12 @@ import {
 } from './emailService';
 import { sendSms, sendAdminSms } from './smsService';
 import { logger } from '../utils/logger';
-import { buildCustomerSms, formatAdminBookingLine } from '../utils/bookingNotifications';
+import {
+  buildCustomerSms,
+  formatAdminBookingLine,
+  formatGuestListForSms,
+  generateUniqueReferenceNumber,
+} from '../utils/bookingNotifications';
 import { normalizePhoneDigits } from '../utils/phone';
 import { getBusinessTimezone } from '../utils/timezone';
 
@@ -186,6 +191,7 @@ export async function assignQueueEntryForSlot(cancelledBooking: IBooking) {
       firstName: guest.firstName,
       lastName: guest.lastName || '',
       email: guest.email,
+      phone: guest.phone,
     })) || [];
 
   const bookingData = {
@@ -204,6 +210,7 @@ export async function assignQueueEntryForSlot(cancelledBooking: IBooking) {
     paymentMethod: entry.preferredPaymentMethod || 'in-person',
     status: (entry.preferredPaymentMethod || 'in-person') === 'now' ? 'pending' : 'confirmed',
     additionalGuests: sanitizedGuests,
+    referenceNumber: await generateUniqueReferenceNumber(),
   };
 
   const newBooking = new Booking(bookingData);
@@ -236,10 +243,7 @@ export async function assignQueueEntryForSlot(cancelledBooking: IBooking) {
   }
 
   const adminLine = formatAdminBookingLine(savedBooking, timezone);
-  const guestSuffix =
-    savedBooking.additionalGuests && savedBooking.additionalGuests.length > 0
-      ? ` [+${savedBooking.additionalGuests.length} guest${savedBooking.additionalGuests.length > 1 ? 's' : ''}]`
-      : '';
+  const guestSuffix = formatGuestListForSms(savedBooking.additionalGuests);
   const adminSmsText = `Queue slot assigned: ${adminLine}${guestSuffix}`;
   sendAdminSms(adminSmsText).catch((err) =>
     logger.error('Queue: failed to SMS admin after assignment', err)
@@ -274,6 +278,7 @@ export async function convertQueueEntry(entryId: string, time: string, overrideS
     paymentMethod: entry.preferredPaymentMethod || 'in-person',
     status: (entry.preferredPaymentMethod || 'in-person') === 'now' ? 'pending' : 'confirmed',
     additionalGuests: entry.additionalGuests,
+    referenceNumber: await generateUniqueReferenceNumber(),
   };
 
   const newBooking = new Booking(bookingData);
@@ -305,10 +310,7 @@ export async function convertQueueEntry(entryId: string, time: string, overrideS
   }
 
   const adminLine = formatAdminBookingLine(savedBooking, timezone);
-  const guestSuffix =
-    savedBooking.additionalGuests && savedBooking.additionalGuests.length > 0
-      ? ` [+${savedBooking.additionalGuests.length} guest${savedBooking.additionalGuests.length > 1 ? 's' : ''}]`
-      : '';
+  const guestSuffix = formatGuestListForSms(savedBooking.additionalGuests);
   const adminSmsText = `Queue entry converted: ${adminLine}${guestSuffix}`;
   sendAdminSms(adminSmsText).catch((err) =>
     logger.error('Queue: failed to SMS admin after manual conversion', err)

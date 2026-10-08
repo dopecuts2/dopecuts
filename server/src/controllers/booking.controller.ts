@@ -21,7 +21,12 @@ import { Otp } from '../models/otp.model';
 import { signManageToken, verifyManageToken, readManageTokenFromReq } from '../utils/manageAuth';
 import { CalendarSettings } from '../models/calendar.model';
 import { WeeklyCalendar } from '../models/weeklyCalendar.model';
-import { buildCustomerSms, formatAdminBookingLine } from '../utils/bookingNotifications';
+import {
+  buildCustomerSms,
+  formatAdminBookingLine,
+  formatGuestListForSms,
+  generateUniqueReferenceNumber,
+} from '../utils/bookingNotifications';
 import { normalizePhoneDigits } from '../utils/phone';
 import {
   assignQueueEntryForSlot,
@@ -145,6 +150,7 @@ interface AdditionalGuestRequest {
   firstName: string;
   lastName?: string;
   email?: string;
+  phone?: string;
   serviceId: string;
   time: string;
 }
@@ -525,6 +531,7 @@ export const createBooking = async (req: Request, res: Response) => {
           firstName: (guest?.firstName || '').trim(),
           lastName: (guest?.lastName || '').trim(),
           email: guest?.email ? String(guest.email).toLowerCase() : undefined,
+          phone: guest?.phone ? String(guest.phone).trim() : undefined,
           serviceId: guest?.serviceId,
           time: guest?.time,
         }))
@@ -620,6 +627,7 @@ export const createBooking = async (req: Request, res: Response) => {
           notes,
           paymentMethod,
           status,
+          referenceNumber: await generateUniqueReferenceNumber(),
         });
 
         primaryBooking = await newBooking.save({ session });
@@ -652,12 +660,14 @@ export const createBooking = async (req: Request, res: Response) => {
           }
 
             const guestLastName = (guest.lastName || '').trim();
+            const guestPhone = guest.phone || phone;
+            const guestPhoneNormalized = guest.phone ? normalizePhoneDigits(guest.phone) : normalizedPhone;
             const guestBooking = new Booking({
               firstName: guest.firstName,
               lastName: guestLastName,
               email: guest.email || String(email).toLowerCase(),
-              phone,
-              phoneNormalized: normalizedPhone,
+              phone: guestPhone,
+              phoneNormalized: guestPhoneNormalized,
               service: guestService.name,
               serviceId: guestService._id as Types.ObjectId,
               price: guestService.price,
@@ -667,6 +677,7 @@ export const createBooking = async (req: Request, res: Response) => {
             notes: primaryFullName ? `Guest linked with ${primaryFullName}` : 'Guest booking',
             paymentMethod,
             status,
+            referenceNumber: await generateUniqueReferenceNumber(),
           });
 
           const savedGuest = await guestBooking.save({ session });
@@ -675,6 +686,7 @@ export const createBooking = async (req: Request, res: Response) => {
               firstName: guest.firstName,
               lastName: guestLastName,
               email: guest.email,
+              phone: guest.phone,
               serviceId: guestService._id as Types.ObjectId,
               serviceName: guestService.name,
               time: guest.time,
@@ -743,10 +755,7 @@ export const createBooking = async (req: Request, res: Response) => {
     );
 
     const adminLine = formatAdminBookingLine(confirmedPrimaryBooking, timezone);
-    const guestSuffix =
-      extraBookings.length > 0
-        ? ` [+${extraBookings.length} guest${extraBookings.length > 1 ? 's' : ''}]`
-        : '';
+    const guestSuffix = formatGuestListForSms(extraBookings);
     const adminMsg = confirmedPrimaryBooking.status === 'pending'
       ? `New PENDING booking: ${adminLine}${guestSuffix}`
       : `New CONFIRMED booking: ${adminLine}${guestSuffix}`;
@@ -1109,10 +1118,7 @@ export const updateBooking = async (req: Request, res: Response) => {
     logSmsOutcome('updateBooking', 'customer', booking.phone, cSms);
 
     const adminLine = formatAdminBookingLine(booking, timezone);
-    const guestSuffix =
-      booking.additionalGuests && booking.additionalGuests.length > 0
-        ? ` [+${booking.additionalGuests.length} guest${booking.additionalGuests.length > 1 ? 's' : ''}]`
-        : '';
+    const guestSuffix = formatGuestListForSms(booking.additionalGuests);
     const aSms = await safeSendAdminSms(`Booking UPDATED: ${adminLine}${guestSuffix}`);
     logSmsOutcome('updateBooking', 'admin', null, aSms);
 
@@ -1194,10 +1200,7 @@ export const cancelBooking = async (req: Request, res: Response) => {
     logSmsOutcome('cancelBooking', 'customer', booking.phone, cSms);
 
     const adminLine = formatAdminBookingLine(booking, timezone);
-    const guestSuffix =
-      booking.additionalGuests && booking.additionalGuests.length > 0
-        ? ` [+${booking.additionalGuests.length} guest${booking.additionalGuests.length > 1 ? 's' : ''}]`
-        : '';
+    const guestSuffix = formatGuestListForSms(booking.additionalGuests);
     const aSms = await safeSendAdminSms(`Booking CANCELLED: ${adminLine}${guestSuffix}`);
     logSmsOutcome('cancelBooking', 'admin', null, aSms);
 

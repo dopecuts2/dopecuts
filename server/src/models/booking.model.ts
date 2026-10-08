@@ -18,10 +18,15 @@ export interface IBooking extends Document {
   serviceId?: Types.ObjectId;
   phoneNormalized: string;
   cancellationNote?: string;
+  // Short, human-friendly code shown to the customer and admin (e.g.
+  // "DC-7F3K2A"), distinct from the Mongo _id. Unique per booking,
+  // including each guest's own booking record.
+  referenceNumber: string;
   additionalGuests?: Array<{
     firstName: string;
     lastName?: string;
     email?: string;
+    phone?: string;
     serviceId?: Types.ObjectId;
     serviceName?: string;
     time?: string;
@@ -46,6 +51,7 @@ const bookingSchema = new Schema<IBooking>({
   notes: { type: String, trim: true },
   serviceId: { type: Schema.Types.ObjectId, ref: 'Service' },
   phoneNormalized: { type: String, required: true, index: true },
+  referenceNumber: { type: String, required: true, unique: true },
 
   // Payment & Status
   // --- FIX: Changed 'later' to 'in-person' in the enum ---
@@ -58,6 +64,7 @@ const bookingSchema = new Schema<IBooking>({
         firstName: { type: String, required: true },
         lastName: { type: String, required: false, default: '' },
         email: { type: String },
+        phone: { type: String },
         serviceId: { type: Schema.Types.ObjectId, ref: 'Service' },
         serviceName: { type: String },
         time: { type: String },
