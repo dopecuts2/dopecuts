@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
-import { Bell, Calendar as CalendarIcon } from 'lucide-react';
+import { Bell, Calendar as CalendarIcon, KeyRound, Copy, Check } from 'lucide-react';
 import moment from 'moment';
 import { toast } from 'sonner';
 import {
@@ -15,6 +15,12 @@ import {
   type NotificationSettings,
 } from '@/lib/api/notifications';
 import { getWeeklyCalendar, updateWeeklyCalendar } from '@/lib/api/calendar';
+import {
+  getApiKeyStatus,
+  generateApiKey,
+  revokeApiKey,
+  type ApiKeyStatus,
+} from '@/lib/api/apiKeys';
 
 type SavingKey =
   | 'emailEnabled'
@@ -63,6 +69,12 @@ export default function Settings() {
   const [durationPresetSaving, setDurationPresetSaving] = useState(false);
   const slotDurationSyncTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const [apiKeyStatus, setApiKeyStatus] = useState<ApiKeyStatus | null>(null);
+  const [apiKeyLoading, setApiKeyLoading] = useState(true);
+  const [apiKeyActionLoading, setApiKeyActionLoading] = useState(false);
+  const [generatedKey, setGeneratedKey] = useState<string | null>(null);
+  const [keyCopied, setKeyCopied] = useState(false);
+
   const [saving, setSaving] = useState<Record<SavingKey, boolean>>({
     emailEnabled: false,
     smsEnabled: false,
@@ -110,6 +122,73 @@ export default function Settings() {
     // Fire and forget
     void load();
   }, [load]);
+
+  const loadApiKeyStatus = useCallback(async () => {
+    setApiKeyLoading(true);
+    try {
+      const status = await getApiKeyStatus();
+      setApiKeyStatus(status);
+    } catch (err) {
+      console.error('Failed to load API key status:', err);
+    } finally {
+      setApiKeyLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadApiKeyStatus();
+  }, [loadApiKeyStatus]);
+
+  const handleGenerateApiKey = async () => {
+    if (
+      apiKeyStatus?.active &&
+      !window.confirm('Generating a new key immediately revokes the current one. Continue?')
+    ) {
+      return;
+    }
+    setApiKeyActionLoading(true);
+    setKeyCopied(false);
+    try {
+      const result = await generateApiKey();
+      setGeneratedKey(result.key);
+      await loadApiKeyStatus();
+      toast.success('API key generated.');
+    } catch (err) {
+      console.error('Failed to generate API key:', err);
+      toast.error('Failed to generate API key.');
+    } finally {
+      setApiKeyActionLoading(false);
+    }
+  };
+
+  const handleRevokeApiKey = async () => {
+    if (!window.confirm('Revoke the AI booking API key? Anything using it will stop working immediately.')) {
+      return;
+    }
+    setApiKeyActionLoading(true);
+    try {
+      await revokeApiKey();
+      setGeneratedKey(null);
+      await loadApiKeyStatus();
+      toast.success('API key revoked.');
+    } catch (err) {
+      console.error('Failed to revoke API key:', err);
+      toast.error('Failed to revoke API key.');
+    } finally {
+      setApiKeyActionLoading(false);
+    }
+  };
+
+  const handleCopyApiKey = async () => {
+    if (!generatedKey) return;
+    try {
+      await navigator.clipboard.writeText(generatedKey);
+      setKeyCopied(true);
+      setTimeout(() => setKeyCopied(false), 2000);
+    } catch {
+      toast.error('Could not copy automatically -- select and copy the key manually.');
+    }
+  };
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -702,6 +781,95 @@ export default function Settings() {
                   : 'Updates apply instantly'}
             </p>
           </div>
+        </CardContent>
+      </Card>
+
+      <Card className="bg-gray-800 border-gray-700">
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <KeyRound className="h-5 w-5 text-white" />
+            <CardTitle className="text-white">AI Booking Access</CardTitle>
+          </div>
+          <CardDescription className="text-gray-300">
+            Let an AI app (like Claude) create bookings for you when you give it customer
+            details and ask it to. Generate a key, give it to the AI app, and revoke it anytime.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {apiKeyLoading ? (
+            <p className="text-sm text-gray-400">Loading…</p>
+          ) : (
+            <>
+              {apiKeyStatus?.active ? (
+                <div className="bg-gray-900 border border-gray-700 rounded-lg p-4 space-y-1">
+                  <p className="text-sm text-white font-medium">
+                    Active key: <span className="font-mono">{apiKeyStatus.keyPrefix}…</span>
+                  </p>
+                  <p className="text-xs text-gray-400">
+                    Created {moment(apiKeyStatus.createdAt).format('MMM D, YYYY h:mm A')}
+                  </p>
+                  <p className="text-xs text-gray-400">
+                    {apiKeyStatus.lastUsedAt
+                      ? `Last used ${moment(apiKeyStatus.lastUsedAt).format('MMM D, YYYY h:mm A')}`
+                      : 'Not used yet'}
+                  </p>
+                </div>
+              ) : (
+                <p className="text-sm text-gray-400">No active key. Generate one to get started.</p>
+              )}
+
+              {generatedKey && (
+                <div className="bg-amber-950/40 border border-amber-700 rounded-lg p-4 space-y-2">
+                  <p className="text-sm text-amber-200 font-medium">
+                    Copy this key now -- it will not be shown again.
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <code className="flex-1 bg-gray-900 border border-gray-700 rounded px-3 py-2 text-xs text-white break-all">
+                      {generatedKey}
+                    </code>
+                    <button
+                      type="button"
+                      onClick={handleCopyApiKey}
+                      className="shrink-0 p-2 rounded-lg bg-gray-900 border border-gray-700 text-white hover:bg-gray-800"
+                    >
+                      {keyCopied ? <Check className="h-4 w-4 text-green-400" /> : <Copy className="h-4 w-4" />}
+                      <span className="sr-only">Copy key</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex flex-wrap gap-3">
+                <button
+                  type="button"
+                  disabled={apiKeyActionLoading}
+                  onClick={handleGenerateApiKey}
+                  className="rounded-lg px-4 py-2 text-sm font-medium bg-white text-black hover:bg-gray-200 disabled:opacity-60"
+                >
+                  {apiKeyStatus?.active ? 'Generate New Key' : 'Generate Key'}
+                </button>
+                {apiKeyStatus?.active && (
+                  <button
+                    type="button"
+                    disabled={apiKeyActionLoading}
+                    onClick={handleRevokeApiKey}
+                    className="rounded-lg px-4 py-2 text-sm font-medium bg-gray-900 border border-red-700 text-red-300 hover:bg-red-950 disabled:opacity-60"
+                  >
+                    Revoke Key
+                  </button>
+                )}
+              </div>
+
+              <div className="text-xs text-gray-400 bg-gray-900/60 border border-gray-800 rounded-lg p-3 space-y-1">
+                <p className="text-gray-300 font-medium">How an AI app uses it:</p>
+                <p>
+                  POST to <code className="text-gray-200">{`${process.env.NEXT_PUBLIC_API_URL || ''}/external/bookings`}</code>{' '}
+                  with header <code className="text-gray-200">Authorization: Bearer &lt;key&gt;</code> and the same
+                  fields as a normal booking (service, date, time, name, phone, email, payment method).
+                </p>
+              </div>
+            </>
+          )}
         </CardContent>
       </Card>
     </div>

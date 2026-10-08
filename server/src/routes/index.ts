@@ -14,6 +14,8 @@ import galleryRouter from './gallery.routes';
 import socialRouter from './social.routes';
 import aboutRouter from './about.routes';
 import queueRouter from './queue.routes';
+import apiKeyRouter from './apiKey.routes';
+import externalRouter from './external.routes';
 
 const router = Router();
 
@@ -31,5 +33,7 @@ router.use('/gallery', galleryRouter);
 router.use('/socials', socialRouter);
 router.use('/about', aboutRouter);
 router.use('/queue', queueRouter);
+router.use('/api-keys', apiKeyRouter);
+router.use('/external', externalRouter);
 
 export default router;
