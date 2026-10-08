@@ -33,6 +33,8 @@ export interface IBooking extends Document {
   }>;
 }
 
+const REFERENCE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no 0/O/1/I
+
 const bookingSchema = new Schema<IBooking>({
   // Customer Info
   firstName: { type: String, required: true, trim: true },
@@ -73,5 +75,26 @@ const bookingSchema = new Schema<IBooking>({
     default: [],
   },
 }, { timestamps: true });
+
+// Backfills referenceNumber on bookings created before this field existed,
+// so re-saving a legacy booking (e.g. confirming payment, cancelling) never
+// fails required-field validation for a code it never got at creation time.
+bookingSchema.pre('validate', async function (next) {
+  if (this.referenceNumber) return next();
+  for (let attempt = 0; attempt < 5; attempt++) {
+    let code = '';
+    for (let i = 0; i < 6; i++) {
+      code += REFERENCE_CHARS[Math.floor(Math.random() * REFERENCE_CHARS.length)];
+    }
+    const candidate = `DC-${code}`;
+    const exists = await Booking.exists({ referenceNumber: candidate });
+    if (!exists) {
+      this.referenceNumber = candidate;
+      return next();
+    }
+  }
+  this.referenceNumber = `DC-${Date.now().toString(36).toUpperCase()}`;
+  next();
+});
 
 export const Booking = model<IBooking>('Booking', bookingSchema);
