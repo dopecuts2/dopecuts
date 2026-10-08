@@ -132,7 +132,7 @@ export default function AdminGalleryPage() {
       fetchGalleryItems();
     } catch (error) {
       console.error('Error adding gallery item:', error);
-      toast.error('Failed to add gallery item');
+      toast.error(error instanceof Error ? error.message : 'Failed to add gallery item');
     } finally {
       setSubmitting(false);
     }
@@ -161,7 +161,7 @@ export default function AdminGalleryPage() {
       fetchGalleryItems();
     } catch (error) {
       console.error('Error updating gallery item:', error);
-      toast.error('Failed to update gallery item');
+      toast.error(error instanceof Error ? error.message : 'Failed to update gallery item');
     } finally {
       setSubmitting(false);
     }

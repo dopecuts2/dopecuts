@@ -21,7 +21,16 @@ const fetchWithApiBase = async (path: string, options: RequestInit = {}) => {
   });
 
   if (!response.ok) {
-    throw new Error(`Gallery request failed: ${response.statusText}`);
+    // Prefer the server's own message (e.g. "Image is too large...") over
+    // the generic status text, which is all a failed upload used to show.
+    let message = `Gallery request failed: ${response.statusText}`;
+    try {
+      const body = await response.clone().json();
+      if (body?.message) message = body.message;
+    } catch {
+      // Response wasn't JSON -- keep the generic message.
+    }
+    throw new Error(message);
  }
 
   return response;
