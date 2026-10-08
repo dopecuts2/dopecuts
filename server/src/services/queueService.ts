@@ -15,9 +15,11 @@ import {
   formatAdminBookingLine,
   formatGuestListForSms,
   generateUniqueReferenceNumber,
+  RESTRICTED_BOOKING_MESSAGE,
 } from '../utils/bookingNotifications';
 import { normalizePhoneDigits } from '../utils/phone';
 import { getBusinessTimezone } from '../utils/timezone';
+import { CustomerRestriction } from '../models/customerRestriction.model';
 
 const SWEEP_INTERVAL_MS = 1000 * 60 * 15; // every 15 minutes
 
@@ -101,6 +103,11 @@ export async function joinQueue(payload: QueueJoinPayload) {
   const normalized = normalizePhoneDigits(phone);
   if (!normalized) {
     throw new Error('Valid phone is required to join the queue.');
+  }
+
+  const restriction = await CustomerRestriction.findOne({ phoneNormalized: normalized });
+  if (restriction?.status === 'banned') {
+    throw new Error(RESTRICTED_BOOKING_MESSAGE);
   }
 
   const targetDate = moment.utc(requestedDate, 'YYYY-MM-DD', true);

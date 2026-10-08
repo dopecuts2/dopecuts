@@ -16,6 +16,7 @@ import aboutRouter from './about.routes';
 import queueRouter from './queue.routes';
 import apiKeyRouter from './apiKey.routes';
 import externalRouter from './external.routes';
+import customerRestrictionRouter from './customerRestriction.routes';
 
 const router = Router();
 
@@ -35,5 +36,6 @@ router.use('/about', aboutRouter);
 router.use('/queue', queueRouter);
 router.use('/api-keys', apiKeyRouter);
 router.use('/external', externalRouter);
+router.use('/customer-restrictions', customerRestrictionRouter);
 
 export default router;

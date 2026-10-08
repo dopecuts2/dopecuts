@@ -24,7 +24,9 @@ import {
   formatAdminBookingLine,
   formatGuestListForSms,
   generateUniqueReferenceNumber,
+  RESTRICTED_BOOKING_MESSAGE,
 } from '../utils/bookingNotifications';
+import { CustomerRestriction } from '../models/customerRestriction.model';
 import { normalizePhoneDigits } from '../utils/phone';
 import {
   assignQueueEntryForSlot,
@@ -349,12 +351,11 @@ export const createBooking = async (req: Request, res: Response) => {
     return res.status(400).json({ message: 'Invalid phone number provided.' });
   }
 
-  const cancellationCount = await Booking.countDocuments({
-    phoneNormalized: normalizedPhone,
-    status: 'cancelled',
-  });
-
-  if (cancellationCount >= 3 && paymentMethod !== 'now') {
+  const restriction = await CustomerRestriction.findOne({ phoneNormalized: normalizedPhone });
+  if (restriction?.status === 'banned') {
+    return res.status(403).json({ message: RESTRICTED_BOOKING_MESSAGE, restricted: true });
+  }
+  if (restriction?.status === 'pay_now_required' && paymentMethod !== 'now') {
     return res.status(403).json({
       message: 'Due to prior cancellations we require prepayment. Select Pay Now to continue.',
     });
@@ -625,7 +626,11 @@ export const joinBookingQueue = async (req: Request, res: Response) => {
     res.status(201).json({ message: 'You are on the queue for the selected day.', entry });
   } catch (error: any) {
     logger.error('Error joining booking queue:', error);
-    const status = error?.message?.includes('already') ? 409 : 400;
+    const status = error?.message === RESTRICTED_BOOKING_MESSAGE
+      ? 403
+      : error?.message?.includes('already')
+      ? 409
+      : 400;
     res.status(status).json({ message: error?.message || 'Failed to join the queue.' });
   }
 };
@@ -1108,6 +1113,25 @@ export const cancelBooking = async (req: Request, res: Response) => {
     assignQueueEntryForSlot(booking).catch((err) =>
       logger.error('Queue assignment after cancel failed:', err)
     );
+
+    // After 3+ cancellations, require prepayment going forward -- as a
+    // standing record an admin can see and remove, not a count that would
+    // just re-trigger itself. Never downgrade an existing 'banned' status.
+    if (booking.phoneNormalized) {
+      Booking.countDocuments({ phoneNormalized: booking.phoneNormalized, status: 'cancelled' })
+        .then(async (cancellationCount) => {
+          if (cancellationCount < 3) return;
+          const existing = await CustomerRestriction.findOne({ phoneNormalized: booking.phoneNormalized });
+          if (existing) return;
+          await CustomerRestriction.create({
+            phone: booking.phone,
+            phoneNormalized: booking.phoneNormalized,
+            status: 'pay_now_required',
+            reason: `Automatically applied after ${cancellationCount} cancellations.`,
+          });
+        })
+        .catch((err) => logger.error('Failed to evaluate cancellation restriction:', err));
+    }
 
     // Emails
     sendBookingCancellationEmail(booking).catch(err => logger.error("Failed to send customer cancellation email:", err));

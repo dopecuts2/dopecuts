@@ -7,7 +7,7 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import PhoneInput from 'react-phone-number-input';
 import 'react-phone-number-input/style.css';
 import { isValidPhoneNumber, E164Number } from 'libphonenumber-js';
-import { Scissors, Calendar, X, Clock, User, Users, CreditCard, ChevronLeft, ChevronRight, Loader2, Copy, MapPin } from 'lucide-react';
+import { Scissors, Calendar, X, Clock, User, Users, CreditCard, ChevronLeft, ChevronRight, Loader2, Copy, MapPin, ShieldBan, Phone, Mail } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -42,6 +42,7 @@ import {
   QueueJoinPayload,
 } from '@/lib/api/booking';
 import { getContactByPhone, IContactLookup } from '@/lib/api/contact';
+import { checkPhoneRestriction } from '@/lib/api/customerRestrictions';
 
 // --- Helper Types ---
 interface AvailableDate {
@@ -55,6 +56,8 @@ interface AvailableDate {
 
 const SHOP_ADDRESS = '646 Upper James Street, Hamilton, ON L9C 2Z2';
 const SHOP_MAPS_LINK = 'https://maps.google.com/?q=646+Upper+James+Street+Hamilton+ON+L9C+2Z2';
+const SHOP_PHONE = '(365) 323-3680';
+const SHOP_EMAIL = 'leeroy@dopecuts.ca';
 
 interface GuestEntry {
   firstName: string;
@@ -140,7 +143,7 @@ export default function BookAppointment() {
   });
   const [showRestOfForm, setShowRestOfForm] = useState(false);
   const [guestEntries, setGuestEntries] = useState<GuestEntry[]>([]);
-  const [cancellationCount, setCancellationCount] = useState(0);
+  const [restrictionStatus, setRestrictionStatus] = useState<'none' | 'pay_now_required' | 'banned'>('none');
   const [queueRequestedDate, setQueueRequestedDate] = useState<string | null>(null);
   const [queueJoined, setQueueJoined] = useState(false);
   const [isJoiningQueue, setIsJoiningQueue] = useState(false);
@@ -401,7 +404,8 @@ export default function BookAppointment() {
     }
   }, [step, confirmedBooking, queueConfirmation]);
 
-  const needsPrepay = cancellationCount >= 3;
+  const needsPrepay = restrictionStatus === 'pay_now_required';
+  const isBanned = restrictionStatus === 'banned';
   const isQueueFlow = Boolean(queueRequestedDate);
   const payAtAppointmentAllowed = !needsPrepay || isQueueFlow;
 
@@ -467,6 +471,15 @@ export default function BookAppointment() {
     if (formData.phone && isValidPhoneNumber(formData.phone)) {
       setShowRestOfForm(true);
 
+      // Restriction check runs independent of whether this number has any
+      // booking/contact history -- an admin-added restriction may predate it.
+      try {
+        const { status } = await checkPhoneRestriction(formData.phone);
+        setRestrictionStatus(status);
+      } catch {
+        setRestrictionStatus('none');
+      }
+
       // Autofill via public contact lookup (new endpoint)
       try {
       const contact: IContactLookup = await getContactByPhone(formData.phone);
@@ -479,10 +492,8 @@ export default function BookAppointment() {
         lastName: last || prev.lastName,
         email: contact.email || prev.email,
       }));
-      setCancellationCount(contact.cancellationCount ?? 0);
       } catch {
         // No contact found or lookup failed -> keep fields empty
-        setCancellationCount(0);
       }
     }
   };
@@ -686,6 +697,10 @@ export default function BookAppointment() {
 
         setAltSuggestions(compressed);
         setStep(2); // return user to time selection
+      } else if (error?.response?.data?.restricted) {
+        setRestrictionStatus('banned');
+        setStep(3);
+        toast.error(error.response.data.message || 'This number has been restricted from booking.');
       } else {
         const errorMessage =
           error?.response?.data?.message ||
@@ -1259,7 +1274,10 @@ export default function BookAppointment() {
                             international
                             defaultCountry="CA"
                             value={formData.phone}
-                            onChange={(value) => setFormData({ ...formData, phone: value || '' })}
+                            onChange={(value) => {
+                              setFormData({ ...formData, phone: value || '' });
+                              setRestrictionStatus('none');
+                            }}
                             className="phone-input"
                           />
                           {formData.phone && !isValidPhoneNumber(formData.phone) && (
@@ -1276,7 +1294,34 @@ export default function BookAppointment() {
                         </div>
                       </div>
 
-                      {showRestOfForm && (
+                      {showRestOfForm && isBanned && (
+                        <div className="space-y-4 border-t border-gray-700 pt-8">
+                          <div className="bg-red-950/40 border border-red-700 rounded-lg p-5 space-y-3">
+                            <div className="flex items-center gap-2">
+                              <ShieldBan className="h-5 w-5 text-red-400" />
+                              <p className="text-white font-semibold">This number has been restricted from booking</p>
+                            </div>
+                            <p className="text-sm text-gray-300">
+                              Please contact DopeCuts to resolve this before booking online.
+                            </p>
+                            <div className="space-y-1 text-sm text-gray-300">
+                              <p className="flex items-center gap-2">
+                                <Phone className="h-4 w-4" /> {SHOP_PHONE}
+                              </p>
+                              <p className="flex items-center gap-2">
+                                <Mail className="h-4 w-4" /> {SHOP_EMAIL}
+                              </p>
+                            </div>
+                            <a href="/contact">
+                              <Button className="bg-white text-black hover:bg-gray-200">
+                                Contact Us
+                              </Button>
+                            </a>
+                          </div>
+                        </div>
+                      )}
+
+                      {showRestOfForm && !isBanned && (
                         <div className="space-y-6 border-t border-gray-700 pt-8">
                           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                             <div>
@@ -1455,7 +1500,7 @@ export default function BookAppointment() {
                               </RadioGroup>
                               {!isQueueFlow && needsPrepay && (
                                 <p className="text-xs text-amber-300 mt-2">
-                                  You have multiple cancellations on record, so we now require the Pay Now option.
+                                  This number requires prepayment for new bookings, so we now require the Pay Now option.
                                 </p>
                               )}
                             </div>
@@ -1746,6 +1791,7 @@ export default function BookAppointment() {
                     !formData.phone ||
                     !isValidPhoneNumber(formData.phone) ||
                     !showRestOfForm ||
+                    isBanned ||
                     !formData.firstName ||
                     !formData.email ||
                     (!queuePreferAnytime && !queuePreferredTime)
@@ -1764,6 +1810,7 @@ export default function BookAppointment() {
                       (!formData.phone ||
                         !isValidPhoneNumber(formData.phone) ||
                         !showRestOfForm ||
+                        isBanned ||
                         !formData.firstName ||
                         !formData.email))
                   }
