@@ -410,3 +410,24 @@ export async function confirmPayment(
   );
   return response.data;
 }
+
+/**
+ * Permanently deletes every booking and every queue entry. Leaves
+ * availability/blocked-time settings, services, and saved contacts
+ * untouched. Irreversible -- requires the exact confirmation phrase.
+ * @access Private (Admin only)
+ */
+export async function clearAllBookingsAndQueue(): Promise<{
+  message: string;
+  deletedBookings: number;
+  deletedQueueEntries: number;
+}> {
+  const response = await apiClient.delete<{
+    message: string;
+    deletedBookings: number;
+    deletedQueueEntries: number;
+  }>('/bookings/admin/clear-all', {
+    data: { confirm: 'DELETE ALL BOOKINGS' },
+  });
+  return response.data;
+}
