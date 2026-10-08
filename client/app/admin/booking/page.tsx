@@ -30,6 +30,7 @@ import {
   IBooking,
   sendBookingMessage,
 } from '@/lib/api/booking';
+import { getAvailability } from '@/lib/api/calendar';
 import {
   Dialog,
   DialogContent,
@@ -144,6 +145,14 @@ export default function BookingManagement() {
     booking: IBooking | null;
   }>({ open: false, type: null, booking: null });
 
+  // Reschedule modal
+  const [rescheduleDate, setRescheduleDate] = useState('');
+  const [rescheduleTime, setRescheduleTime] = useState('');
+  const [rescheduleSlots, setRescheduleSlots] = useState<string[]>([]);
+  const [rescheduleSlotsLoading, setRescheduleSlotsLoading] = useState(false);
+  const [rescheduleSlotsError, setRescheduleSlotsError] = useState<string | null>(null);
+  const [rescheduleSuggestions, setRescheduleSuggestions] = useState<string[]>([]);
+
   const [noteModalOpen, setNoteModalOpen] = useState(false);
   const [noteModalBooking, setNoteModalBooking] = useState<IBooking | null>(null);
   const [noteDraft, setNoteDraft] = useState('');
@@ -242,7 +251,79 @@ export default function BookingManagement() {
   };
 
   const handleReschedule = (booking: IBooking) => {
+    setRescheduleDate(booking.date.slice(0, 10));
+    setRescheduleTime(booking.time);
+    setRescheduleSlots([]);
+    setRescheduleSlotsError(null);
+    setRescheduleSuggestions([]);
     openActionModal('reschedule', booking);
+  };
+
+  // Load available times whenever the reschedule modal is open and the
+  // picked date changes. Always includes the booking's current slot even
+  // if it wouldn't otherwise show up (e.g. it's in the past, or exactly at
+  // capacity) so re-confirming the same time is never blocked.
+  useEffect(() => {
+    if (!actionModal.open || actionModal.type !== 'reschedule' || !actionModal.booking || !rescheduleDate) {
+      return;
+    }
+    const booking = actionModal.booking;
+    let cancelled = false;
+    const load = async () => {
+      setRescheduleSlotsLoading(true);
+      setRescheduleSlotsError(null);
+      try {
+        const opts = booking.serviceId
+          ? { serviceId: booking.serviceId }
+          : { serviceDuration: booking.duration };
+        const slots = await getAvailability(rescheduleDate, opts);
+        if (cancelled) return;
+        const isCurrentSlot = rescheduleDate === booking.date.slice(0, 10);
+        const withCurrent =
+          isCurrentSlot && booking.time && !slots.includes(booking.time)
+            ? [...slots, booking.time]
+            : slots;
+        setRescheduleSlots(withCurrent);
+      } catch (err: any) {
+        if (!cancelled) {
+          setRescheduleSlotsError(err?.response?.data?.message || 'Failed to load available times.');
+          setRescheduleSlots([]);
+        }
+      } finally {
+        if (!cancelled) setRescheduleSlotsLoading(false);
+      }
+    };
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, [actionModal.open, actionModal.type, actionModal.booking, rescheduleDate]);
+
+  const handleConfirmReschedule = async () => {
+    if (!actionModal.booking || !rescheduleDate || !rescheduleTime) return;
+    setIsActionProcessing(true);
+    setRescheduleSuggestions([]);
+    try {
+      const { booking: updatedBooking } = await updateBookingAdmin(actionModal.booking._id, {
+        date: rescheduleDate,
+        time: rescheduleTime,
+      });
+      setBookings((prev) =>
+        prev.map((b) => (b._id === updatedBooking._id ? updatedBooking : b))
+      );
+      toast.success('Booking rescheduled.');
+      closeActionModal();
+    } catch (err: any) {
+      if (err?.status === 409) {
+        toast.error(err.message || 'That time is no longer available.');
+        setRescheduleSuggestions(err.suggestions || []);
+      } else {
+        const msg = err?.response?.data?.message || err?.message || 'Failed to reschedule booking.';
+        toast.error(msg);
+      }
+    } finally {
+      setIsActionProcessing(false);
+    }
   };
 
   const handleConfirmCancel = async () => {
@@ -737,7 +818,7 @@ export default function BookingManagement() {
       </Dialog>
 
       <Dialog open={actionModal.open} onOpenChange={(open) => !open && closeActionModal()}>
-        <DialogContent>
+        <DialogContent className={actionModal.type === 'reschedule' ? 'max-w-lg' : undefined}>
           <DialogHeader>
             <DialogTitle>
               {actionModal.type === 'cancel'
@@ -755,11 +836,79 @@ export default function BookingManagement() {
                     : 'This will cancel the selected booking.';
                 }
                 return booking
-                  ? `Rescheduling ${booking.firstName} ${booking.lastName} is coming soon.`
-                  : 'Rescheduling is coming soon.';
+                  ? `Pick a new date and time for ${booking.firstName} ${booking.lastName} (currently ${dateFmt.format(
+                      toBookingDateTime(booking)
+                    )} at ${booking.time}).`
+                  : 'Pick a new date and time.';
               })()}
             </DialogDescription>
           </DialogHeader>
+
+          {actionModal.type === 'reschedule' && actionModal.booking && (
+            <div className="space-y-4">
+              <div>
+                <label className="text-xs text-gray-400 uppercase tracking-wide">New date</label>
+                <input
+                  type="date"
+                  value={rescheduleDate}
+                  onChange={(e) => {
+                    setRescheduleDate(e.target.value);
+                    setRescheduleTime('');
+                  }}
+                  className="mt-1 w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs text-gray-400 uppercase tracking-wide">New time</label>
+                {rescheduleSlotsLoading ? (
+                  <p className="text-sm text-gray-400 mt-2">Loading available times…</p>
+                ) : rescheduleSlotsError ? (
+                  <p className="text-sm text-red-400 mt-2">{rescheduleSlotsError}</p>
+                ) : rescheduleSlots.length === 0 ? (
+                  <p className="text-sm text-gray-400 mt-2">No available times on this date.</p>
+                ) : (
+                  <div className="mt-2 grid grid-cols-3 gap-2">
+                    {rescheduleSlots.map((slot) => (
+                      <button
+                        key={slot}
+                        type="button"
+                        onClick={() => setRescheduleTime(slot)}
+                        className={`text-sm rounded-lg border-2 py-2 transition-colors ${
+                          rescheduleTime === slot
+                            ? 'border-white bg-white text-black'
+                            : 'border-gray-700 bg-gray-900 text-white hover:border-gray-500'
+                        }`}
+                      >
+                        {slot}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {rescheduleSuggestions.length > 0 && (
+                <div>
+                  <p className="text-xs text-amber-300 mb-2">Try one of these times instead:</p>
+                  <div className="grid grid-cols-3 gap-2">
+                    {rescheduleSuggestions.map((slot) => (
+                      <button
+                        key={`suggestion-${slot}`}
+                        type="button"
+                        onClick={() => {
+                          setRescheduleTime(slot);
+                          setRescheduleSuggestions([]);
+                        }}
+                        className="text-sm rounded-lg border-2 border-amber-500 bg-gray-900 text-amber-200 py-2 hover:bg-amber-950"
+                      >
+                        {slot}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           <DialogFooter className="mt-4 gap-2">
             <Button
@@ -767,14 +916,19 @@ export default function BookingManagement() {
               onClick={closeActionModal}
               disabled={isActionProcessing}
             >
-              {actionModal.type === 'cancel' ? 'Keep booking' : 'Close'}
+              {actionModal.type === 'cancel' ? 'Keep booking' : 'Cancel'}
             </Button>
             {actionModal.type === 'cancel' ? (
               <Button onClick={handleConfirmCancel} disabled={isActionProcessing}>
                 {isActionProcessing ? 'Cancelling...' : 'Cancel booking'}
               </Button>
             ) : (
-              <Button onClick={closeActionModal}>Ok</Button>
+              <Button
+                onClick={handleConfirmReschedule}
+                disabled={isActionProcessing || !rescheduleDate || !rescheduleTime}
+              >
+                {isActionProcessing ? 'Rescheduling...' : 'Reschedule'}
+              </Button>
             )}
           </DialogFooter>
         </DialogContent>
