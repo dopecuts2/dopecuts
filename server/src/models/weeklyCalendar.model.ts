@@ -45,7 +45,11 @@ const weeklyDaySchema = new Schema<IWeeklyCalendarDay>({
   endTime: { type: String, required: true },
   slotDuration: { type: Number, required: true, default: 40 },
   isEnabled: { type: Boolean, required: true, default: true },
-  useDefaultHours: { type: Boolean, required: true, default: false },
+  // Defaults to true so a day that predates this field (saved before the
+  // toggle existed) is treated the same as a never-configured day: still
+  // following the shop's Default Schedule, not frozen on whatever values
+  // happened to be stored.
+  useDefaultHours: { type: Boolean, required: true, default: true },
   blockedTimes: {
     type: [blockedTimeSchema],
     default: [],
