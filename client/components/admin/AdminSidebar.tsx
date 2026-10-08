@@ -35,7 +35,7 @@ const navItems: NavItem[] = [
   // Core operations
   { title: 'Booking', href: '/admin/booking', icon: Calendar },
   { title: 'Queue', href: '/admin/queue', icon: CalendarClock },
-  { title: 'Calendar', href: '/admin/calendar', icon: CalendarClock },
+  { title: 'Availability', href: '/admin/calendar', icon: CalendarClock },
 
   // Catalog
   { title: 'Services', href: '/admin/services', icon: Scissors },

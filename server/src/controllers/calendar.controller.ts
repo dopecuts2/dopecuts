@@ -6,135 +6,17 @@ import { Booking } from '../models/booking.model';
 import { Service } from '../models/service.model';
 import { logger } from '../utils/logger';
 import { getBusinessTimezone } from '../utils/timezone';
-
-const DEFAULT_START_TIME = '11:00';
-const DEFAULT_END_TIME = '19:00';
-const DEFAULT_SLOT_DURATION = 45;
-const DAY_ORDER = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-
-// Per-weekday defaults used whenever a day hasn't been explicitly
-// configured (either via Weekly Availability for that specific week, or
-// via the day-of-week template). Days not listed here fall back to the
-// generic DEFAULT_START_TIME/DEFAULT_END_TIME above.
-const DEFAULT_DAY_HOURS: Record<string, { startTime: string; endTime: string; isEnabled: boolean }> = {
-  Sunday: { startTime: DEFAULT_START_TIME, endTime: DEFAULT_END_TIME, isEnabled: false },
-  Monday: { startTime: '11:00', endTime: '16:40', isEnabled: true },
-  Tuesday: { startTime: '11:00', endTime: '16:40', isEnabled: true },
-  Saturday: { startTime: '09:20', endTime: '17:20', isEnabled: true },
-};
-
-function getDefaultDayHours(dayOfWeek: string) {
-  return (
-    DEFAULT_DAY_HOURS[dayOfWeek] || {
-      startTime: DEFAULT_START_TIME,
-      endTime: DEFAULT_END_TIME,
-      isEnabled: true,
-    }
-  );
-}
-
-function resolveAdaptiveDuration(
-  _serviceName: string | undefined,
-  baseDuration: number,
-  slotDuration?: number
-) {
-  // The admin now chooses an explicit duration (15/30/45/60 min) per
-  // service, so that value is authoritative -- no more inferring/forcing
-  // duration from the service name or flooring it to the slot length.
-  if (baseDuration) return baseDuration;
-  return normalizeSlotDuration(slotDuration ?? DEFAULT_SLOT_DURATION);
-}
-
-function gcd(a: number, b: number): number {
-  let x = Math.max(a, 0);
-  let y = Math.max(b, 0);
-  while (y !== 0) {
-    const temp = y;
-    y = x % y;
-    x = temp;
-  }
-  return x || 1;
-}
-
-function computeSlotStep(slotDuration: number, serviceDuration: number) {
-  const baseSlot = normalizeSlotDuration(slotDuration || DEFAULT_SLOT_DURATION);
-  const service = serviceDuration || baseSlot;
-
-  if (service === baseSlot) return baseSlot;
-
-  // If the service is shorter than the base slot, offer start times
-  // spaced by the service's own duration (its explicit, admin-chosen
-  // value), rather than a derived/finer cadence that wouldn't match
-  // what was configured for the service.
-  if (service < baseSlot) {
-    return service;
-  }
-
-  if (service > baseSlot) {
-    const divisor = gcd(baseSlot, service);
-    if (divisor >= baseSlot / 2) return divisor;
-    return baseSlot;
-  }
-
-  return baseSlot;
-}
-
-function normalizeSlotDuration(duration?: number | null) {
-  if (!duration) return DEFAULT_SLOT_DURATION;
-  // Promote legacy slot-duration defaults to the current cadence
-  if (duration === 35 || duration === 40) return DEFAULT_SLOT_DURATION;
-  return duration;
-}
-
-interface TimeInterval {
-  start: moment.Moment;
-  end: moment.Moment;
-}
-
-/**
- * Merge a list of occupied intervals (clamped to [dayStart, dayEnd]) and
- * return the free gaps between them, in chronological order. This is the
- * basis of "gap-based" availability: rather than walking a fixed clock
- * grid and discarding any tick that overlaps a booking, we work out the
- * actual free windows first, so a slot can start right where the
- * previous booking ends (e.g. 2:45) instead of only at grid marks.
- */
-function computeFreeGaps(
-  dayStart: moment.Moment,
-  dayEnd: moment.Moment,
-  occupied: TimeInterval[]
-): TimeInterval[] {
-  const clamped = occupied
-    .map((iv) => ({
-      start: moment.max(iv.start, dayStart),
-      end: moment.min(iv.end, dayEnd),
-    }))
-    .filter((iv) => iv.start.isBefore(iv.end))
-    .sort((a, b) => a.start.valueOf() - b.start.valueOf());
-
-  const merged: TimeInterval[] = [];
-  for (const iv of clamped) {
-    const last = merged[merged.length - 1];
-    if (last && !iv.start.isAfter(last.end)) {
-      if (iv.end.isAfter(last.end)) last.end = iv.end;
-    } else {
-      merged.push({ start: iv.start.clone(), end: iv.end.clone() });
-    }
-  }
-
-  const gaps: TimeInterval[] = [];
-  let cursor = dayStart.clone();
-  for (const iv of merged) {
-    if (iv.start.isAfter(cursor)) {
-      gaps.push({ start: cursor.clone(), end: iv.start.clone() });
-    }
-    if (iv.end.isAfter(cursor)) cursor = iv.end.clone();
-  }
-  if (cursor.isBefore(dayEnd)) {
-    gaps.push({ start: cursor.clone(), end: dayEnd.clone() });
-  }
-  return gaps;
-}
+import {
+  DAY_ORDER,
+  DEFAULT_SLOT_DURATION,
+  getDefaultDayHours,
+  normalizeSlotDuration,
+  computeSlotStep,
+  resolveAdaptiveDuration,
+  computeFreeGaps,
+  getDaySettingsFor,
+  TimeInterval,
+} from '../utils/availability';
 
 interface WeeklyDayPayload {
   dayOfWeek: string;
@@ -142,7 +24,8 @@ interface WeeklyDayPayload {
   endTime: string;
   slotDuration: number;
   isEnabled: boolean;
-  blockedTimes: Array<{ startTime: string; endTime: string }>;
+  useDefaultHours: boolean;
+  blockedTimes: Array<{ startTime: string; endTime: string; isEnabled: boolean }>;
 }
 
 interface WeeklyCalendarPayload {
@@ -151,6 +34,9 @@ interface WeeklyCalendarPayload {
   slotDuration: number;
 }
 
+// An unconfigured day/week hasn't diverged from the Default Schedule yet,
+// so it starts out toggled on (following the default) rather than frozen
+// with a one-time copy of today's default values.
 const buildDefaultDay = (dayOfWeek: string): WeeklyDayPayload => {
   const defaults = getDefaultDayHours(dayOfWeek);
   return {
@@ -159,7 +45,8 @@ const buildDefaultDay = (dayOfWeek: string): WeeklyDayPayload => {
     endTime: defaults.endTime,
     slotDuration: DEFAULT_SLOT_DURATION,
     isEnabled: defaults.isEnabled,
-    blockedTimes: [],
+    useDefaultHours: true,
+    blockedTimes: defaults.breaks.map((b) => ({ ...b, isEnabled: true })),
   };
 };
 
@@ -169,6 +56,30 @@ const buildDefaultWeek = (weekStart: string): WeeklyCalendarPayload => ({
   days: DAY_ORDER.map((day) => buildDefaultDay(day)),
 });
 
+// A day toggled on dynamically mirrors the live Default Schedule, so the
+// admin editor must show the current default values for it rather than
+// whatever was last saved (which could be stale if the default changed).
+function resolveDayForDisplay(dayObj: any): WeeklyDayPayload {
+  if (dayObj.useDefaultHours) {
+    const defaults = getDefaultDayHours(dayObj.dayOfWeek);
+    return {
+      dayOfWeek: dayObj.dayOfWeek,
+      startTime: defaults.startTime,
+      endTime: defaults.endTime,
+      slotDuration: DEFAULT_SLOT_DURATION,
+      isEnabled: dayObj.isEnabled,
+      useDefaultHours: true,
+      blockedTimes: defaults.breaks.map((b) => ({ ...b, isEnabled: true })),
+    };
+  }
+  return {
+    ...dayObj,
+    slotDuration: normalizeSlotDuration(dayObj.slotDuration),
+    useDefaultHours: false,
+    blockedTimes: (dayObj.blockedTimes || []).map((b: any) => ({ ...b, isEnabled: b.isEnabled !== false })),
+  };
+}
+
 async function fetchWeekData(weekStart: string): Promise<WeeklyCalendarPayload> {
   const weekly = await WeeklyCalendar.findOne({ weekStart });
   if (weekly) {
@@ -177,54 +88,11 @@ async function fetchWeekData(weekStart: string): Promise<WeeklyCalendarPayload> 
       slotDuration: normalizeSlotDuration(weekly.slotDuration),
       days: weekly.days.map((day) => {
         const dayObj = (day as any)?.toObject ? (day as any).toObject() : day;
-        return {
-          ...dayObj,
-          slotDuration: normalizeSlotDuration(dayObj.slotDuration),
-        };
+        return resolveDayForDisplay(dayObj);
       }),
     };
   }
   return buildDefaultWeek(weekStart);
-}
-
-async function getDaySettingsFor(dateISO: string, timezone: string) {
-  const target = moment.tz(dateISO, 'YYYY-MM-DD', timezone);
-  const dayOfWeek = target.format('dddd');
-  const weekStart = target.clone().startOf('isoWeek').format('YYYY-MM-DD');
-
-  const weekly = await WeeklyCalendar.findOne({ weekStart });
-  if (weekly) {
-    const day = weekly.days.find((d) => d.dayOfWeek === dayOfWeek);
-    if (day) {
-      return {
-        startTime: day.startTime,
-        endTime: day.endTime,
-        slotDuration: normalizeSlotDuration(day.slotDuration),
-        breaks: day.blockedTimes,
-        isEnabled: day.isEnabled,
-      };
-    }
-  }
-
-  const fallback = await CalendarSettings.findOne({ dayOfWeek });
-  if (fallback) {
-    return {
-      startTime: fallback.startTime,
-      endTime: fallback.endTime,
-      slotDuration: normalizeSlotDuration(fallback.slotDuration),
-      breaks: fallback.breaks,
-      isEnabled: fallback.isEnabled,
-    };
-  }
-
-  const defaults = getDefaultDayHours(dayOfWeek);
-  return {
-    startTime: defaults.startTime,
-    endTime: defaults.endTime,
-    slotDuration: DEFAULT_SLOT_DURATION,
-    breaks: [],
-    isEnabled: defaults.isEnabled,
-  };
 }
 
 export const getWeeklySchedules = async (req: Request, res: Response) => {
@@ -272,7 +140,12 @@ export const updateWeeklySchedules = async (req: Request, res: Response) => {
               endTime: day.endTime,
               slotDuration: normalizeSlotDuration(day.slotDuration),
               isEnabled: day.isEnabled,
-              blockedTimes: day.blockedTimes || [],
+              useDefaultHours: Boolean(day.useDefaultHours),
+              blockedTimes: (day.blockedTimes || []).map((b) => ({
+                startTime: b.startTime,
+                endTime: b.endTime,
+                isEnabled: b.isEnabled !== false,
+              })),
             })),
           },
         },
@@ -287,10 +160,7 @@ export const updateWeeklySchedules = async (req: Request, res: Response) => {
       slotDuration: normalizeSlotDuration(week.slotDuration),
       days: week.days.map((day) => {
         const dayObj = (day as any)?.toObject ? (day as any).toObject() : day;
-        return {
-          ...dayObj,
-          slotDuration: normalizeSlotDuration(dayObj.slotDuration),
-        };
+        return resolveDayForDisplay(dayObj);
       }),
     }));
     res.status(200).json({ message: 'Weekly schedule updated successfully.', weeks: normalizedWeeks });
@@ -324,7 +194,7 @@ export const getCalendarSettings = async (_req: Request, res: Response) => {
         endTime: defaults.endTime,
         slotDuration: DEFAULT_SLOT_DURATION,
         isEnabled: defaults.isEnabled,
-        breaks: [],
+        breaks: defaults.breaks.map((b) => ({ ...b })),
       };
     });
 
