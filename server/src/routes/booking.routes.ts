@@ -11,6 +11,8 @@ import {
   verifyPhoneOtp,
   startEmailOtp,
   verifyEmailOtp,
+  startManageLookup,
+  verifyManageLookup,
   getManageBooking,
   joinBookingQueue,
   sendBookingMessage,
@@ -32,6 +34,11 @@ router.post('/phone-otp/verify', verifyPhoneOtp);
 // Email OTP for reschedule/cancel verification
 router.post('/email-otp/start', startEmailOtp);
 router.post('/email-otp/verify', verifyEmailOtp);
+
+// Reference-number-based manage lookup (reference + email or phone, code
+// always sent to the booking's own email)
+router.post('/manage-lookup/start', startManageLookup);
+router.post('/manage-lookup/verify', verifyManageLookup);
 
 // Token-based manage lookup (Bearer token or manageToken in body/query)
 router.get('/manage', getManageBooking);

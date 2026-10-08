@@ -39,10 +39,8 @@ import {
 
 // API
 import {
-  startPhoneOtp,
-  verifyPhoneOtp,
-  startEmailOtp,
-  verifyEmailOtp,
+  startManageLookup,
+  verifyManageLookup,
   getManageBooking,
   updateBookingPublic,
   cancelBookingPublic,
@@ -128,7 +126,8 @@ export default function RescheduleAppointment() {
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
 
   // Identity verification
-  const [verifyMethod, setVerifyMethod] = useState<'phone' | 'email'>('phone');
+  const [referenceNumber, setReferenceNumber] = useState<string>('');
+  const [verifyMethod, setVerifyMethod] = useState<'phone' | 'email'>('email');
   const [phone, setPhone] = useState<string>('');
   const [email, setEmail] = useState<string>('');
   const [codeSent, setCodeSent] = useState(false);
@@ -197,17 +196,18 @@ export default function RescheduleAppointment() {
     };
   }, [appointment, newDate]);
 
-  // API: Send OTP
+  // API: Send verification code (reference number + email or phone)
   const handleSendCode = async () => {
     setErrorMsg('');
+    if (!referenceNumber.trim()) return;
     try {
       setLoadingSend(true);
       if (verifyMethod === 'phone') {
         if (!phone || !isValidPhoneNumber(phone)) return;
-        await startPhoneOtp({ phone });
+        await startManageLookup({ referenceNumber: referenceNumber.trim(), phone });
       } else {
         if (!email || !validateEmail(email)) return;
-        await startEmailOtp({ email });
+        await startManageLookup({ referenceNumber: referenceNumber.trim(), email });
       }
       setCodeSent(true);
     } catch (err: any) {
@@ -217,20 +217,14 @@ export default function RescheduleAppointment() {
     }
   };
 
-  // API: Verify OTP → get token → fetch booking
+  // API: Verify code → get token → fetch booking
   const handleVerifyCode = async () => {
     setErrorMsg('');
     if (codeInput.trim().length !== 6) return;
     try {
       setLoadingVerify(true);
-      let token = '';
-      if (verifyMethod === 'phone') {
-        const out = await verifyPhoneOtp({ phone, otp: codeInput.trim() });
-        token = out.token;
-      } else {
-        const out = await verifyEmailOtp({ email, otp: codeInput.trim() });
-        token = out.token;
-      }
+      const out = await verifyManageLookup({ referenceNumber: referenceNumber.trim(), otp: codeInput.trim() });
+      const token = out.token;
       setManageToken(token);
 
       const manage = await getManageBooking(token);
@@ -467,7 +461,7 @@ export default function RescheduleAppointment() {
                   )}
                 </CardTitle>
                 <CardDescription className="text-gray-300 text-base lg:text-lg">
-                  {step === 1 && 'Use your phone or email to verify your appointment'}
+                  {step === 1 && 'Enter your reference number and email (or phone) to find your appointment'}
                   {step === 2 && 'Choose a new date and time that works for you'}
                   {step === 3 && 'Confirm the details before finalizing the change'}
                   {step === 4 && 'Your appointment has been rescheduled'}
@@ -478,52 +472,34 @@ export default function RescheduleAppointment() {
                 {/* Step 1: Verify */}
                 {step === 1 && (
                   <div className="space-y-8">
-                    {/* Verification method toggle (fixed selected + hover states) */}
-                    <div className="flex gap-3">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        aria-pressed={verifyMethod === 'phone'}
-                        onClick={() => {
-                          setVerifyMethod('phone');
-                          setEmail('');
-                          setCodeSent(false);
-                          setCodeInput('');
-                          setVerified(false);
-                          setErrorMsg('');
-                        }}
-                        className={`flex-1 text-sm font-medium border ${
-                          verifyMethod === 'phone'
-                            ? 'bg-white text-black border-white shadow-lg hover:bg-white hover:text-black'
-                            : 'bg-gray-800 text-gray-200 border-gray-600 hover:bg-gray-700 hover:text-white'
-                        }`}
-                      >
-                        Use Phone
-                      </Button>
-
-                      <Button
-                        type="button"
-                        variant="outline"
-                        aria-pressed={verifyMethod === 'email'}
-                        onClick={() => {
-                          setVerifyMethod('email');
-                          setPhone('');
-                          setCodeSent(false);
-                          setCodeInput('');
-                          setVerified(false);
-                          setErrorMsg('');
-                        }}
-                        className={`flex-1 text-sm font-medium border ${
-                          verifyMethod === 'email'
-                            ? 'bg-white text-black border-white shadow-lg hover:bg-white hover:text-black'
-                            : 'bg-gray-800 text-gray-200 border-gray-600 hover:bg-gray-700 hover:text-white'
-                        }`}
-                      >
-                        Use Email
-                      </Button>
+                    <div className="space-y-4">
+                      <Label className="text-white font-medium">Reference Number</Label>
+                      <Input
+                        value={referenceNumber}
+                        onChange={(e) => setReferenceNumber(e.target.value.toUpperCase())}
+                        placeholder="DC-XXXXXX"
+                        className="bg-gray-700 border-gray-600 text-white"
+                      />
+                      <p className="text-xs text-gray-400">
+                        Found in your booking confirmation text or email.
+                      </p>
                     </div>
 
-                    {verifyMethod === 'phone' && (
+                    {verifyMethod === 'email' ? (
+                      <div className="space-y-4">
+                        <Label className="text-white font-medium">Email Address</Label>
+                        <Input
+                          type="email"
+                          value={email}
+                          onChange={(e) => setEmail(e.target.value)}
+                          placeholder="you@example.com"
+                          className="bg-gray-700 border-gray-600 text-white"
+                        />
+                        {email && !validateEmail(email) && (
+                          <p className="text-red-400 text-sm">Please enter a valid email</p>
+                        )}
+                      </div>
+                    ) : (
                       <div className="space-y-4">
                         <Label className="text-white font-medium">Phone Number</Label>
                         <PhoneInput
@@ -543,98 +519,66 @@ export default function RescheduleAppointment() {
                         {phone && !isValidPhoneNumber(phone) && (
                           <p className="text-red-400 text-sm">Please enter a valid phone number</p>
                         )}
-
-                        {!codeSent ? (
-                          <Button
-                            onClick={handleSendCode}
-                            disabled={!phone || !isValidPhoneNumber(phone) || loadingSend}
-                            className="bg-white text-black border border-transparent hover:border-blue-400 hover:bg-gray-100 hover:shadow-lg transition-all duration-200"
-                          >
-                            {loadingSend ? 'Sending…' : 'Send Code'}
-                          </Button>
-                        ) : (
-                          <div className="space-y-3">
-                            <Label className="text-white font-medium">Enter 6-digit Code</Label>
-                            <Input
-                              value={codeInput}
-                              onChange={(e) => setCodeInput(e.target.value)}
-                              maxLength={6}
-                              placeholder="Enter code"
-                              className="bg-gray-700 border-gray-600 text-white"
-                            />
-                            <div className="flex gap-3">
-                              <Button
-                                onClick={handleVerifyCode}
-                                disabled={codeInput.length !== 6 || loadingVerify}
-                                className="bg-white text-black border border-transparent hover:border-blue-400 hover:bg-gray-100 hover:shadow-lg transition-all duration-200"
-                              >
-                                {loadingVerify ? 'Verifying…' : 'Verify'}
-                              </Button>
-                              <Button
-                                variant="outline"
-                                onClick={handleSendCode}
-                                disabled={loadingSend}
-                                className="border-gray-600 text-white hover:border-blue-400 hover:bg-gray-800 transition-all duration-200"
-                              >
-                                {loadingSend ? 'Resending…' : 'Resend'}
-                              </Button>
-                            </div>
-                          </div>
-                        )}
                       </div>
                     )}
 
-                    {verifyMethod === 'email' && (
-                      <div className="space-y-4">
-                        <Label className="text-white font-medium">Email Address</Label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setVerifyMethod(verifyMethod === 'email' ? 'phone' : 'email');
+                        setCodeSent(false);
+                        setCodeInput('');
+                        setVerified(false);
+                        setErrorMsg('');
+                      }}
+                      className="text-sm text-gray-300 underline underline-offset-2 hover:text-white"
+                    >
+                      {verifyMethod === 'email' ? 'Use phone number instead' : 'Use email instead'}
+                    </button>
+
+                    {!codeSent ? (
+                      <Button
+                        onClick={handleSendCode}
+                        disabled={
+                          !referenceNumber.trim() ||
+                          (verifyMethod === 'email'
+                            ? !email || !validateEmail(email)
+                            : !phone || !isValidPhoneNumber(phone)) ||
+                          loadingSend
+                        }
+                        className="bg-white text-black border border-transparent hover:border-blue-400 hover:bg-gray-100 hover:shadow-lg transition-all duration-200"
+                      >
+                        {loadingSend ? 'Sending…' : 'Send Code'}
+                      </Button>
+                    ) : (
+                      <div className="space-y-3">
+                        <Label className="text-white font-medium">
+                          Enter the code we emailed you
+                        </Label>
                         <Input
-                          type="email"
-                          value={email}
-                          onChange={(e) => setEmail(e.target.value)}
-                          placeholder="you@example.com"
+                          value={codeInput}
+                          onChange={(e) => setCodeInput(e.target.value)}
+                          maxLength={6}
+                          placeholder="Enter code"
                           className="bg-gray-700 border-gray-600 text-white"
                         />
-                        {email && !validateEmail(email) && (
-                          <p className="text-red-400 text-sm">Please enter a valid email</p>
-                        )}
-
-                        {!codeSent ? (
+                        <div className="flex gap-3">
                           <Button
-                            onClick={handleSendCode}
-                            disabled={!email || !validateEmail(email) || loadingSend}
+                            onClick={handleVerifyCode}
+                            disabled={codeInput.length !== 6 || loadingVerify}
                             className="bg-white text-black border border-transparent hover:border-blue-400 hover:bg-gray-100 hover:shadow-lg transition-all duration-200"
                           >
-                            {loadingSend ? 'Sending…' : 'Send Code'}
+                            {loadingVerify ? 'Verifying…' : 'Verify'}
                           </Button>
-                        ) : (
-                          <div className="space-y-3">
-                            <Label className="text-white font-medium">Enter 6-digit Code</Label>
-                            <Input
-                              value={codeInput}
-                              onChange={(e) => setCodeInput(e.target.value)}
-                              maxLength={6}
-                              placeholder="Enter code"
-                              className="bg-gray-700 border-gray-600 text-white"
-                            />
-                            <div className="flex gap-3">
-                              <Button
-                                onClick={handleVerifyCode}
-                                disabled={codeInput.length !== 6 || loadingVerify}
-                                className="bg-white text-black border border-transparent hover:border-blue-400 hover:bg-gray-100 hover:shadow-lg transition-all duration-200"
-                              >
-                                {loadingVerify ? 'Verifying…' : 'Verify'}
-                              </Button>
-                              <Button
-                                variant="outline"
-                                onClick={handleSendCode}
-                                disabled={loadingSend}
-                                className="border-gray-600 text-white hover:border-blue-400 hover:bg-gray-800 transition-all duration-200"
-                              >
-                                {loadingSend ? 'Resending…' : 'Resend'}
-                              </Button>
-                            </div>
-                          </div>
-                        )}
+                          <Button
+                            variant="outline"
+                            onClick={handleSendCode}
+                            disabled={loadingSend}
+                            className="border-gray-600 text-white hover:border-blue-400 hover:bg-gray-800 transition-all duration-200"
+                          >
+                            {loadingSend ? 'Resending…' : 'Resend'}
+                          </Button>
+                        </div>
                       </div>
                     )}
                   </div>
