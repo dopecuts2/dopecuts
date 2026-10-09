@@ -221,14 +221,62 @@ export default function BookAppointment() {
   }, [guestEntries.length, maxAdditionalGuests]);
 
   const canAddGuest = Boolean(formData.date) && remainingSlotsForNewGuest.length > 0;
-  const mainTimeOptions = useMemo(
-    () => timeSlots.filter((slot) => !usedTimesSet.has(slot) || slot === formData.time),
-    [timeSlots, usedTimesSet, formData.time]
-  );
+
+  // Duration-aware overlap check for the in-progress booking + guests, none
+  // of which exist in the database yet (only the final submit creates them),
+  // so the server's own availability check has no way to know about them.
+  // A slot label alone isn't enough -- e.g. a 40-minute 11:00 AM booking
+  // occupies 11:00-11:40, so 11:20 AM must be excluded too, not just the
+  // exact "11:00 AM" string.
+  const timeLabelToMinutes = (label?: string): number | null => {
+    if (!label) return null;
+    const m = moment(label, 'h:mm A', true);
+    return m.isValid() ? m.hours() * 60 + m.minutes() : null;
+  };
+
+  const buildOccupiedIntervals = (excludeOwner: 'main' | number) => {
+    const intervals: Array<{ start: number; end: number }> = [];
+    if (excludeOwner !== 'main' && formData.time) {
+      const start = timeLabelToMinutes(formData.time);
+      const duration = getAdaptiveDuration(services.find((s) => s._id === formData.serviceId));
+      if (start !== null) intervals.push({ start, end: start + duration });
+    }
+    guestEntries.forEach((guest, idx) => {
+      if (idx === excludeOwner || !guest.time) return;
+      const start = timeLabelToMinutes(guest.time);
+      if (start === null) return;
+      const duration = getAdaptiveDuration(services.find((s) => s._id === guest.serviceId));
+      intervals.push({ start, end: start + duration });
+    });
+    return intervals;
+  };
+
+  const excludeOverlapping = (
+    slots: string[],
+    candidateDuration: number,
+    occupied: Array<{ start: number; end: number }>,
+    currentTime?: string
+  ) =>
+    slots.filter((slot) => {
+      if (slot === currentTime) return true;
+      const start = timeLabelToMinutes(slot);
+      if (start === null) return true;
+      const end = start + candidateDuration;
+      return !occupied.some((iv) => start < iv.end && end > iv.start);
+    });
+
+  const mainTimeOptions = useMemo(() => {
+    const duration = getAdaptiveDuration(services.find((s) => s._id === formData.serviceId));
+    const occupied = buildOccupiedIntervals('main');
+    return excludeOverlapping(timeSlots, duration, occupied, formData.time);
+  }, [timeSlots, services, guestEntries, formData.time, formData.serviceId]);
 
   const timeOptionsForGuest = (guestIndex: number, currentTime?: string) => {
     const guestSlots = guestTimeSlots[guestIndex] || timeSlots;
-    return guestSlots.filter((slot) => !usedTimesSet.has(slot) || slot === currentTime);
+    const guest = guestEntries[guestIndex];
+    const duration = getAdaptiveDuration(services.find((s) => s._id === guest?.serviceId));
+    const occupied = buildOccupiedIntervals(guestIndex);
+    return excludeOverlapping(guestSlots, duration, occupied, currentTime);
   };
 
   const currentWeekDates = weekBuckets[currentWeekIdx] || [];
