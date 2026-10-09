@@ -25,4 +25,4 @@ export const AWS_REGION = process.env.AWS_REGION || 'us-east-1';
 export const SMS_SENDER_ID = process.env.SMS_SENDER_ID; // string; may be alpha or numeric
 export const SMS_FORCE_SENDER_ID = process.env.SMS_FORCE_SENDER_ID === 'true'; // try SenderID even for +1
 export const ADMIN_PHONE = process.env.ADMIN_PHONE;     // required for admin SMS
-export const SMS_DAILY_LIMIT = Number(process.env.SMS_DAILY_LIMIT || 20);
+export const SMS_DAILY_LIMIT = Number(process.env.SMS_DAILY_LIMIT || 60);
