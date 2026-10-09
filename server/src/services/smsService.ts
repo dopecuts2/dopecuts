@@ -30,11 +30,11 @@ async function initSmsAttributes() {
     const cmd = new SetSMSAttributesCommand({
       attributes: {
         DefaultSMSType: 'Transactional',
-        MonthlySpendLimit: '50',
+        MonthlySpendLimit: '100',
       },
     });
     await snsClient.send(cmd);
-    logger.info('SNS SMS attributes set (Transactional; MonthlySpendLimit=50).');
+    logger.info('SNS SMS attributes set (Transactional; MonthlySpendLimit=100).');
   } catch (err) {
     logger.warn('SetSMSAttributes failed (non-fatal):', err);
   }
