@@ -28,13 +28,13 @@ export const DEFAULT_DAY_HOURS: Record<string, DefaultDayHours> = {
     startTime: '11:00',
     endTime: '16:20',
     isEnabled: true,
-    breaks: [{ startTime: '13:00', endTime: '16:00' }],
+    breaks: [{ startTime: '13:00', endTime: '13:40' }],
   },
   Tuesday: {
     startTime: '11:00',
     endTime: '16:20',
     isEnabled: true,
-    breaks: [{ startTime: '13:00', endTime: '16:00' }],
+    breaks: [{ startTime: '13:00', endTime: '13:40' }],
   },
   Wednesday: {
     startTime: '11:00',
