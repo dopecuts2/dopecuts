@@ -57,7 +57,7 @@ export const getAllGalleryItems = async (req: Request, res: Response) => {
   }
 
   try {
-    const items = await GalleryItem.find(query).sort({ createdAt: -1 });
+    const items = await GalleryItem.find(query).sort({ createdAt: -1 }).allowDiskUse(true);
     res.status(200).json(items);
   } catch (error) {
     logger.error('Error fetching gallery items:', error);
