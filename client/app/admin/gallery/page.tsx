@@ -42,6 +42,7 @@ export default function AdminGalleryPage() {
   const [items, setItems] = useState<IGallery[]>([]);
   const [services, setServices] = useState<IService[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -86,9 +87,11 @@ export default function AdminGalleryPage() {
       setLoading(true);
       const data = await getAllGalleryItems();
       setItems(data || []);
+      setLoadError(false);
     } catch (error) {
       console.error('Error fetching gallery items:', error);
-      toast.error('Failed to load gallery items');
+      toast.error(error instanceof Error ? error.message : 'Failed to load gallery items');
+      setLoadError(true);
     } finally {
       setLoading(false);
     }
@@ -249,6 +252,22 @@ export default function AdminGalleryPage() {
                 </Card>
               ))}
             </div>
+          ) : loadError ? (
+            <Card className="border-white/10 bg-white/5 backdrop-blur text-white">
+              <CardContent className="flex flex-col items-center justify-center py-16">
+                <ImageIcon className="h-16 w-16 text-gray-300 mb-4" />
+                <h3 className="text-xl font-semibold mb-2">Couldn&apos;t load gallery items</h3>
+                <p className="text-gray-300 mb-6">
+                  Something went wrong fetching the gallery. Your items may still be saved — try again.
+                </p>
+                <Button
+                  onClick={fetchGalleryItems}
+                  className="bg-black text-white hover:bg-black/90"
+                >
+                  Retry
+                </Button>
+              </CardContent>
+            </Card>
           ) : items.length === 0 ? (
             <Card className="border-white/10 bg-white/5 backdrop-blur text-white">
               <CardContent className="flex flex-col items-center justify-center py-16">
