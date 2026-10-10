@@ -214,6 +214,13 @@ export function Footer() {
                 <p className="text-sm text-white/80">
                   Crafted with precision and passion for the modern gentleman.
                 </p>
+                <p className="text-sm text-white/60 mt-2">
+                  Formerly dopecuts.ca —{' '}
+                  <Link href="/dopecuts-ca" className="underline hover:text-white transition-colors">
+                    DopeCuts is now online here
+                  </Link>
+                  .
+                </p>
               </div>
 
               <div className="flex flex-wrap justify-center lg:justify-end gap-6">
