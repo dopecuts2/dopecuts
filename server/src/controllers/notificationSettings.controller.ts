@@ -38,6 +38,10 @@ export const updateSettings = async (req: Request, res: Response) => {
       productNoticeMessage: string;
       calendarWeeks: number;
       durationPreset: 'standard' | 'legacy';
+      reminder1Enabled: boolean;
+      reminder1MinutesBefore: number;
+      reminder2Enabled: boolean;
+      reminder2MinutesBefore: number;
     }> = req.body ?? {};
 
     if (payload.timezone && !moment.tz.zone(payload.timezone)) {
@@ -50,6 +54,12 @@ export const updateSettings = async (req: Request, res: Response) => {
     }
     if (payload.durationPreset !== undefined && !['standard', 'legacy'].includes(payload.durationPreset)) {
       return res.status(400).json({ message: 'durationPreset must be either "standard" or "legacy".' });
+    }
+    for (const key of ['reminder1MinutesBefore', 'reminder2MinutesBefore'] as const) {
+      const val = payload[key];
+      if (val !== undefined && (typeof val !== 'number' || val < 5 || val > 10080 || val % 5 !== 0)) {
+        return res.status(400).json({ message: `${key} must be a multiple of 5 between 5 and 10080.` });
+      }
     }
 
     const updated = await NotificationSettings.findOneAndUpdate(

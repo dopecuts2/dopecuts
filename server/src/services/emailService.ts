@@ -108,6 +108,7 @@ type EmailKind =
   | 'payment'      // customer payment confirmation
   | 'update'       // customer updated booking
   | 'cancel'       // customer cancellation
+  | 'reminder'     // customer appointment reminder
   | 'admin'        // admin notifications
   | 'custom'       // arbitrary messages to customer
   | 'otp';         // admin OTP
@@ -209,6 +210,51 @@ export const sendBookingConfirmationEmail = async (bookingDetails: IBooking) => 
   const res = await guardedSend('confirmation', email, subject, html);
   if (!res.success) {
     console.error(`Error sending confirmation email to ${email}:`, res.error);
+  }
+  return res;
+};
+
+/** Turns a minutes count into a friendly phrase, e.g. "1 hour 30 minutes" or "1 day". */
+function formatLeadTime(minutesBefore: number): string {
+  const days = Math.floor(minutesBefore / 1440);
+  const hours = Math.floor((minutesBefore % 1440) / 60);
+  const minutes = minutesBefore % 60;
+  const parts: string[] = [];
+  if (days > 0) parts.push(`${days} day${days === 1 ? '' : 's'}`);
+  if (hours > 0) parts.push(`${hours} hour${hours === 1 ? '' : 's'}`);
+  if (minutes > 0) parts.push(`${minutes} minute${minutes === 1 ? '' : 's'}`);
+  return parts.length ? parts.join(' ') : 'shortly';
+}
+
+export const sendAppointmentReminderEmail = async (
+  bookingDetails: IBooking,
+  minutesBefore: number
+) => {
+  const { email, firstName, service, date, time, referenceNumber } = bookingDetails;
+  const formattedDate = moment(date).format('MMMM DD, YYYY');
+  const leadTime = formatLeadTime(minutesBefore);
+
+  const subject = `Reminder: Your Dopecuts appointment is in ${leadTime}`;
+  const html = `
+    <div style="font-family: Arial, sans-serif; color: #333;">
+      <h2>Hey ${firstName}, just a reminder!</h2>
+      <p>Your appointment is coming up in about <strong>${leadTime}</strong>. Please plan to arrive on time.</p>
+      <table style="width: 100%; border-collapse: collapse;">
+        <tr><td style="padding: 8px; border: 1px solid #ddd;">Reference #:</td><td style="padding: 8px; border: 1px solid #ddd;"><strong>${referenceNumber}</strong></td></tr>
+        <tr><td style="padding: 8px; border: 1px solid #ddd;">Service:</td><td style="padding: 8px; border: 1px solid #ddd;"><strong>${service}</strong></td></tr>
+        <tr><td style="padding: 8px; border: 1px solid #ddd;">Date:</td><td style="padding: 8px; border: 1px solid #ddd;"><strong>${formattedDate}</strong></td></tr>
+        <tr><td style="padding: 8px; border: 1px solid #ddd;">Time:</td><td style="padding: 8px; border: 1px solid #ddd;"><strong>${time}</strong></td></tr>
+      </table>
+      ${locationBlock()}
+      ${calendarButtonBlock(bookingDetails)}
+      ${manageAppointmentBlock('Need to reschedule or cancel?')}
+      <p style="margin-top:20px;">See you soon,<br/>The Dopecuts Team</p>
+    </div>
+  `;
+
+  const res = await guardedSend('reminder', email, subject, html);
+  if (!res.success) {
+    console.error(`Error sending reminder email to ${email}:`, res.error);
   }
   return res;
 };

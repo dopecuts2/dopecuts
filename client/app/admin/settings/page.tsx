@@ -39,7 +39,25 @@ type SavingKey =
   | 'autoSendBookingConfirmations'
   | 'timezone'
   | 'siteNoticeEnabled'
-  | 'productNoticeEnabled';
+  | 'productNoticeEnabled'
+  | 'reminder1Enabled'
+  | 'reminder2Enabled';
+
+/** Turns a minutes count into a compact label, e.g. "1h 30m" or "1d". */
+function formatMinutesLabel(mins: number): string {
+  const days = Math.floor(mins / 1440);
+  const hours = Math.floor((mins % 1440) / 60);
+  const minutes = mins % 60;
+  const parts: string[] = [];
+  if (days > 0) parts.push(`${days}d`);
+  if (hours > 0) parts.push(`${hours}h`);
+  if (minutes > 0) parts.push(`${minutes}m`);
+  return parts.length ? parts.join(' ') : '0m';
+}
+
+const REMINDER_MINUTES_MIN = 30;
+const REMINDER_MINUTES_MAX = 10080; // 7 days
+const REMINDER_STEP = 30;
 
 const fallbackTimezones = [
   'America/Toronto',
@@ -80,6 +98,13 @@ export default function Settings() {
   const [durationPresetSaving, setDurationPresetSaving] = useState(false);
   const slotDurationSyncTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const [reminder1Enabled, setReminder1Enabled] = useState(true);
+  const [reminder1Minutes, setReminder1Minutes] = useState(90);
+  const [reminder2Enabled, setReminder2Enabled] = useState(true);
+  const [reminder2Minutes, setReminder2Minutes] = useState(1440);
+  const reminder1SyncTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const reminder2SyncTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const [apiKeyStatus, setApiKeyStatus] = useState<ApiKeyStatus | null>(null);
   const [apiKeyLoading, setApiKeyLoading] = useState(true);
   const [apiKeyActionLoading, setApiKeyActionLoading] = useState(false);
@@ -98,6 +123,8 @@ export default function Settings() {
     timezone: false,
     siteNoticeEnabled: false,
     productNoticeEnabled: false,
+    reminder1Enabled: false,
+    reminder2Enabled: false,
   });
   const [saveError, setSaveError] = useState<Record<SavingKey, string | null>>({
     emailEnabled: null,
@@ -106,6 +133,8 @@ export default function Settings() {
     timezone: null,
     siteNoticeEnabled: null,
     productNoticeEnabled: null,
+    reminder1Enabled: null,
+    reminder2Enabled: null,
   });
 
   const load = useCallback(async () => {
@@ -127,6 +156,10 @@ export default function Settings() {
       if (s.durationPreset === 'standard' || s.durationPreset === 'legacy') {
         setDurationPreset(s.durationPreset);
       }
+      setReminder1Enabled(s.reminder1Enabled ?? true);
+      if (s.reminder1MinutesBefore) setReminder1Minutes(s.reminder1MinutesBefore);
+      setReminder2Enabled(s.reminder2Enabled ?? true);
+      if (s.reminder2MinutesBefore) setReminder2Minutes(s.reminder2MinutesBefore);
     } catch (err: any) {
       setFetchError(err?.message || 'Failed to load notification settings.');
     } finally {
@@ -247,7 +280,29 @@ export default function Settings() {
       if (slotDurationSyncTimeout.current) {
         clearTimeout(slotDurationSyncTimeout.current);
       }
+      if (reminder1SyncTimeout.current) {
+        clearTimeout(reminder1SyncTimeout.current);
+      }
+      if (reminder2SyncTimeout.current) {
+        clearTimeout(reminder2SyncTimeout.current);
+      }
     };
+  }, []);
+
+  const adjustReminderMinutes = useCallback((which: 1 | 2, delta: number) => {
+    const setter = which === 1 ? setReminder1Minutes : setReminder2Minutes;
+    const timeoutRef = which === 1 ? reminder1SyncTimeout : reminder2SyncTimeout;
+    const key = which === 1 ? 'reminder1MinutesBefore' : 'reminder2MinutesBefore';
+    setter((prev) => {
+      const next = Math.min(REMINDER_MINUTES_MAX, Math.max(REMINDER_MINUTES_MIN, prev + delta));
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      timeoutRef.current = setTimeout(() => {
+        void updateNotificationSettings({ [key]: next }).catch(() => {
+          toast.error('Failed to save reminder timing.');
+        });
+      }, 400);
+      return next;
+    });
   }, []);
 
   const timezoneOptions = useMemo(() => {
@@ -560,6 +615,107 @@ export default function Settings() {
                         checked,
                         () => setBookingConfirmations(prev)
                       );
+                    }}
+                  />
+                </div>
+              </div>
+
+              <Separator className="bg-gray-700" />
+
+              {/* Reminder 1 */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="space-y-0.5 flex-1">
+                  <Label htmlFor="reminder1" className="text-white text-sm md:text-base">
+                    Appointment Reminder 1
+                  </Label>
+                  <p className="text-xs sm:text-sm text-gray-400">
+                    Emails the customer {formatMinutesLabel(reminder1Minutes)} before their appointment.
+                  </p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-1 bg-gray-900 border border-gray-700 rounded-lg px-1">
+                    <button
+                      type="button"
+                      onClick={() => adjustReminderMinutes(1, -REMINDER_STEP)}
+                      disabled={reminder1Minutes <= REMINDER_MINUTES_MIN}
+                      className="px-2 py-1 text-white disabled:opacity-40"
+                      aria-label="Decrease reminder 1 lead time"
+                    >
+                      −
+                    </button>
+                    <span className="text-sm text-white px-2 min-w-[64px] text-center">
+                      {formatMinutesLabel(reminder1Minutes)}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => adjustReminderMinutes(1, REMINDER_STEP)}
+                      disabled={reminder1Minutes >= REMINDER_MINUTES_MAX}
+                      className="px-2 py-1 text-white disabled:opacity-40"
+                      aria-label="Increase reminder 1 lead time"
+                    >
+                      +
+                    </button>
+                  </div>
+                  {saving.reminder1Enabled && <span className="text-xs text-gray-400">Saving…</span>}
+                  <Switch
+                    id="reminder1"
+                    checked={reminder1Enabled}
+                    disabled={saving.reminder1Enabled}
+                    onCheckedChange={(checked) => {
+                      const prev = reminder1Enabled;
+                      setReminder1Enabled(checked);
+                      void handleToggle('reminder1Enabled', checked, () => setReminder1Enabled(prev));
+                    }}
+                  />
+                </div>
+              </div>
+
+              <Separator className="bg-gray-700" />
+
+              {/* Reminder 2 */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="space-y-0.5 flex-1">
+                  <Label htmlFor="reminder2" className="text-white text-sm md:text-base">
+                    Appointment Reminder 2
+                  </Label>
+                  <p className="text-xs sm:text-sm text-gray-400">
+                    A second, earlier reminder — emails the customer {formatMinutesLabel(reminder2Minutes)} before, for
+                    anyone who booked further in advance.
+                  </p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-1 bg-gray-900 border border-gray-700 rounded-lg px-1">
+                    <button
+                      type="button"
+                      onClick={() => adjustReminderMinutes(2, -REMINDER_STEP)}
+                      disabled={reminder2Minutes <= REMINDER_MINUTES_MIN}
+                      className="px-2 py-1 text-white disabled:opacity-40"
+                      aria-label="Decrease reminder 2 lead time"
+                    >
+                      −
+                    </button>
+                    <span className="text-sm text-white px-2 min-w-[64px] text-center">
+                      {formatMinutesLabel(reminder2Minutes)}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => adjustReminderMinutes(2, REMINDER_STEP)}
+                      disabled={reminder2Minutes >= REMINDER_MINUTES_MAX}
+                      className="px-2 py-1 text-white disabled:opacity-40"
+                      aria-label="Increase reminder 2 lead time"
+                    >
+                      +
+                    </button>
+                  </div>
+                  {saving.reminder2Enabled && <span className="text-xs text-gray-400">Saving…</span>}
+                  <Switch
+                    id="reminder2"
+                    checked={reminder2Enabled}
+                    disabled={saving.reminder2Enabled}
+                    onCheckedChange={(checked) => {
+                      const prev = reminder2Enabled;
+                      setReminder2Enabled(checked);
+                      void handleToggle('reminder2Enabled', checked, () => setReminder2Enabled(prev));
                     }}
                   />
                 </div>

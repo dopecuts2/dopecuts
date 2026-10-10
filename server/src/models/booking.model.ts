@@ -22,6 +22,8 @@ export interface IBooking extends Document {
   // "DC-7F3K2A"), distinct from the Mongo _id. Unique per booking,
   // including each guest's own booking record.
   referenceNumber: string;
+  reminder1Sent?: boolean;
+  reminder2Sent?: boolean;
   additionalGuests?: Array<{
     firstName: string;
     lastName?: string;
@@ -54,6 +56,8 @@ const bookingSchema = new Schema<IBooking>({
   serviceId: { type: Schema.Types.ObjectId, ref: 'Service' },
   phoneNormalized: { type: String, required: true, index: true },
   referenceNumber: { type: String, required: true, unique: true },
+  reminder1Sent: { type: Boolean, default: false },
+  reminder2Sent: { type: Boolean, default: false },
 
   // Payment & Status
   // --- FIX: Changed 'later' to 'in-person' in the enum ---

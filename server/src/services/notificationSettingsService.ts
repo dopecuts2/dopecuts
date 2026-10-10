@@ -26,6 +26,10 @@ export async function getNotificationSettings(): Promise<INotificationSettings> 
       productNoticeMessage: '',
       calendarWeeks: 3,
       durationPreset: 'standard',
+      reminder1Enabled: true,
+      reminder1MinutesBefore: 90,
+      reminder2Enabled: true,
+      reminder2MinutesBefore: 1440,
     });
   } else {
     let mutated = false;
@@ -55,6 +59,22 @@ export async function getNotificationSettings(): Promise<INotificationSettings> 
     }
     if (doc.durationPreset === undefined) {
       doc.durationPreset = 'standard';
+      mutated = true;
+    }
+    if (doc.reminder1Enabled === undefined) {
+      doc.reminder1Enabled = true;
+      mutated = true;
+    }
+    if (doc.reminder1MinutesBefore === undefined) {
+      doc.reminder1MinutesBefore = 90;
+      mutated = true;
+    }
+    if (doc.reminder2Enabled === undefined) {
+      doc.reminder2Enabled = true;
+      mutated = true;
+    }
+    if (doc.reminder2MinutesBefore === undefined) {
+      doc.reminder2MinutesBefore = 1440;
       mutated = true;
     }
     if (mutated) await doc.save();
