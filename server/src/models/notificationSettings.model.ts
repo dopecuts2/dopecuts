@@ -17,6 +17,12 @@ export interface INotificationSettings extends Document {
   // offers: 'standard' = 15/30/45/60 min, 'legacy' = 20/40 min (matches
   // the scheme the old dopecuts.ca site used).
   durationPreset: 'standard' | 'legacy';
+  // Appointment reminder emails: two independently toggleable reminders,
+  // each firing a configurable number of minutes before the appointment.
+  reminder1Enabled: boolean;
+  reminder1MinutesBefore: number;
+  reminder2Enabled: boolean;
+  reminder2MinutesBefore: number;
 }
 
 const notificationSettingsSchema = new Schema<INotificationSettings>({
@@ -36,6 +42,10 @@ const notificationSettingsSchema = new Schema<INotificationSettings>({
     enum: ['standard', 'legacy'],
     default: 'standard',
   },
+  reminder1Enabled: { type: Boolean, required: true, default: true },
+  reminder1MinutesBefore: { type: Number, required: true, default: 90, min: 5, max: 10080 },
+  reminder2Enabled: { type: Boolean, required: true, default: true },
+  reminder2MinutesBefore: { type: Number, required: true, default: 1440, min: 5, max: 10080 },
 }, { timestamps: true });
 
 // Removed duplicate index - 'unique: true' on the field already creates an index

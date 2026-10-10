@@ -16,6 +16,10 @@ export interface NotificationSettings {
   productNoticeMessage: string;
   calendarWeeks: number;
   durationPreset: 'standard' | 'legacy';
+  reminder1Enabled: boolean;
+  reminder1MinutesBefore: number;
+  reminder2Enabled: boolean;
+  reminder2MinutesBefore: number;
 }
 
 export async function getNotificationSettings(): Promise<NotificationSettings> {
@@ -24,7 +28,7 @@ export async function getNotificationSettings(): Promise<NotificationSettings> {
 }
 
 export async function updateNotificationSettings(
-  payload: Partial<Pick<NotificationSettings, 'emailEnabled' | 'smsEnabled' | 'autoSendBookingConfirmations' | 'timezone' | 'siteNoticeEnabled' | 'siteNoticeMessage' | 'productNoticeEnabled' | 'productNoticeMessage' | 'calendarWeeks' | 'durationPreset'>>
+  payload: Partial<Pick<NotificationSettings, 'emailEnabled' | 'smsEnabled' | 'autoSendBookingConfirmations' | 'timezone' | 'siteNoticeEnabled' | 'siteNoticeMessage' | 'productNoticeEnabled' | 'productNoticeMessage' | 'calendarWeeks' | 'durationPreset' | 'reminder1Enabled' | 'reminder1MinutesBefore' | 'reminder2Enabled' | 'reminder2MinutesBefore'>>
 ): Promise<{ message: string; settings: NotificationSettings }> {
   const { data } = await apiClient.put<{ message: string; settings: NotificationSettings }>(
     '/notifications/settings',

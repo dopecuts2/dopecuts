@@ -20,6 +20,8 @@ import mainRouter from './src/routes';
 
 import { startQueueSweeper } from './src/services/queueService';
 
+import { startReminderSweeper } from './src/services/reminderService';
+
 
 
 const app = express();
@@ -104,7 +106,9 @@ async function bootstrap() {
     await connectDB();
     
     startQueueSweeper();
-    
+
+    startReminderSweeper();
+
     app.listen(PORT, () => logger.info(`🚀 Server running on port ${PORT}`));
     
   } catch (error) {
