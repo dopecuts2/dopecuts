@@ -29,7 +29,7 @@ const ensureAboutDoc = async () => {
 export const getAbout = async (_req: Request, res: Response) => {
   try {
     const about = await ensureAboutDoc();
-    const barbers = await Barber.find({ isActive: true }).sort({ order: 1, createdAt: 1 });
+    const barbers = await Barber.find({ isActive: true }).sort({ order: 1, createdAt: 1 }).allowDiskUse(true);
     res.status(200).json({ about, barbers });
   } catch (error) {
     logger.error('Error fetching about page:', error);

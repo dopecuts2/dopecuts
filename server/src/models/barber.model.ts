@@ -21,4 +21,10 @@ const barberSchema = new Schema<IBarber>(
   { timestamps: true }
 );
 
+// Lets the public "active barbers, in order" query use the index instead
+// of an in-memory sort, which can hit MongoDB's 32MB sort limit once a
+// photo is stored as an oversized inline data URL (see imageService's
+// fallback) rather than a small R2 link.
+barberSchema.index({ isActive: 1, order: 1, createdAt: 1 });
+
 export const Barber = model<IBarber>('Barber', barberSchema);

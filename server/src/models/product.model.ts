@@ -20,4 +20,10 @@ const productSchema = new Schema<IProduct>(
   { timestamps: true }
 );
 
+// Lets the public product-list sort use the index instead of an
+// in-memory sort, which can hit MongoDB's 32MB sort limit once a
+// photo is stored as an oversized inline data URL (see imageService's
+// fallback) rather than a small R2 link.
+productSchema.index({ createdAt: -1 });
+
 export const Product = model<IProduct>('Product', productSchema);
