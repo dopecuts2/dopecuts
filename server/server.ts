@@ -28,7 +28,11 @@ const app = express();
 
 
 
-app.set('trust proxy', false);
+// Railway sits in front of the app as a single reverse proxy, adding its
+// own X-Forwarded-For header to every request. Trusting that one hop lets
+// Express (and the rate limiter) read the real client IP correctly instead
+// of throwing ERR_ERL_UNEXPECTED_X_FORWARDED_FOR on every request.
+app.set('trust proxy', 1);
 
 
 
