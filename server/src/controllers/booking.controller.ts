@@ -931,7 +931,12 @@ export const updateBooking = async (req: Request, res: Response) => {
       const token = readManageTokenFromReq(req);
       if (token) {
         const idt = verifyManageToken(token);
-        if (idt && ((idt.phone && idt.phone === booking.phone) || (idt.email && idt.email === booking.email))) {
+        if (
+          idt &&
+          ((idt.phone && idt.phone === booking.phone) ||
+            (idt.email && idt.email === booking.email) ||
+            (idt.referenceNumber && idt.referenceNumber === booking.referenceNumber))
+        ) {
           authorized = true;
         }
       }
@@ -1079,7 +1084,12 @@ export const cancelBooking = async (req: Request, res: Response) => {
       const token = readManageTokenFromReq(req);
       if (token) {
         const idt = verifyManageToken(token);
-        if (idt && ((idt.phone && idt.phone === booking.phone) || (idt.email && idt.email === booking.email))) {
+        if (
+          idt &&
+          ((idt.phone && idt.phone === booking.phone) ||
+            (idt.email && idt.email === booking.email) ||
+            (idt.referenceNumber && idt.referenceNumber === booking.referenceNumber))
+        ) {
           authorized = true;
         }
       }
