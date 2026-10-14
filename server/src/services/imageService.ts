@@ -28,7 +28,13 @@ const r2Client =
       })
     : null;
 
-const PUBLIC_BASE = CLOUDFLARE_PUBLIC_URL || (R2_BUCKET_NAME && R2_ENDPOINT ? `${R2_ENDPOINT}/${R2_BUCKET_NAME}` : '');
+// Strip any trailing slash(es) regardless of how the Railway variable was
+// entered, so toPublicUrl's own '/' join never produces a double slash
+// (e.g. ".r2.dev//dopecuts/...") -- R2 treats that as a different, missing
+// object path, which is what made freshly uploaded images 404.
+const PUBLIC_BASE = (
+  CLOUDFLARE_PUBLIC_URL || (R2_BUCKET_NAME && R2_ENDPOINT ? `${R2_ENDPOINT}/${R2_BUCKET_NAME}` : '')
+).replace(/\/+$/, '');
 
 function buildKey(prefix: string, fileName: string) {
   const safeName = fileName.replace(/\s+/g, '-');
